@@ -1,4 +1,6 @@
 /// Cavl is a generic C implementation of AVL tree suitable for deeply embedded systems distributed as a single header.
+/// To integrate it into your project, simply copy the only header into your source tree.
+///
 /// Cavl is best used with O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for
 /// hard-real-time high-integrity embedded systems.
 ///
@@ -29,17 +31,17 @@ extern "C" {
 
 // ----------------------------------------         PUBLIC API SECTION         ----------------------------------------
 
-/// The tree node/root object. User types should put this item as the very first field.
+/// The tree node/root object. User types should put this item as the very first field or (in case of C++) inherit.
 typedef struct Cavl Cavl;
 struct Cavl
 {
     Cavl*   parent;
     Cavl*   left;
     Cavl*   right;
-    uint8_t height;  ///< Limits the capacity at 2**255 nodes.
+    uint8_t height;  ///< Limits the capacity at 2**255 nodes (over 10**76, an astronomical number).
 };
 
-/// Returns negative if the node value is greater than the search target, positive if smaller, zero on match.
+/// Returns positive if the search target is greater than the node value, negative if smaller, zero on match (found).
 typedef int8_t CavlPredicate(void* user_reference, const Cavl* node);
 
 /// If provided, the factory is invoked if the searched node could not be found.
@@ -57,13 +59,13 @@ typedef void CavlVisitor(void* user_reference, Cavl* node);
 ///   if the factory returned NULL, behave as if factory was NULL.
 /// The user_reference is passed into the functions unmodified.
 /// If predicate is NULL, returns NULL.
-static inline Cavl* cavlSearch(Cavl* const          root,
+static inline Cavl* cavlSearch(Cavl** const         root,
                                void* const          user_reference,
                                CavlPredicate* const predicate,
                                CavlFactory* const   factory);
 
 /// Remove the specified node from its tree in constant time. No search is necessary.
-static inline Cavl* cavlRemove(Cavl* const node);
+static inline void cavlRemove(Cavl* const node);
 
 /// Calls the visitor with each node in the specified order: ascending (in-order) or descending (reverse in-order).
 /// The node pointer passed to the visitor is guaranteed to be valid.
@@ -84,9 +86,120 @@ static inline void cavlTraverse(Cavl* const        root,
 
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
-static inline uint8_t _cavlGetAdjustedHeight(const Cavl* const nd) {}
+static inline uint8_t _cavlGetHeight(const Cavl* const nd)
+{
+    return (nd != NULL) ? nd->height : 0;
+}
 
-static inline int16_t _cavlGetBalance(const Cavl* const nd) {}
+static inline void _cavlAdjustHeight(Cavl* const nd)
+{
+    const uint8_t lf = _cavlGetHeight(nd->left);
+    const uint8_t rt = _cavlGetHeight(nd->right);
+    nd->height       = (uint8_t) (1U + ((lf > rt) ? lf : rt));
+}
+
+static inline int8_t _cavlGetBalance(const Cavl* const nd)
+{
+    int16_t bal = 0;
+    if (nd != NULL)
+    {
+        bal = (int16_t) ((int16_t) (_cavlGetHeight(nd->right)) - (int16_t) (_cavlGetHeight(nd->left)));
+        assert((bal >= -2) && (bal <= 2));
+    }
+    return (int8_t) bal;
+}
+
+static inline Cavl* _cavlRotateRight(Cavl* const nd)
+{
+    assert((nd != NULL) && (nd->left != NULL));
+    Cavl* const new_nd = nd->left;
+    if (nd->parent != NULL)
+    {
+        if (nd->parent->left == nd)
+        {
+            nd->parent->left = new_nd;
+        }
+        else
+        {
+            assert(nd->parent->right == nd);
+            nd->parent->right = new_nd;
+        }
+    }
+    new_nd->parent = nd->parent;
+    nd->parent     = new_nd;
+    nd->left       = new_nd->right;
+    if (nd->left != NULL)
+    {
+        nd->left->parent = nd;
+    }
+    new_nd->right = nd;
+    _cavlAdjustHeight(nd);
+    _cavlAdjustHeight(new_nd);
+    return new_nd;
+}
+
+static inline Cavl* _cavlRotateLeft(Cavl* const nd)
+{
+    assert((nd != NULL) && (nd->right != NULL));
+    Cavl* const new_nd = nd->right;
+    if (nd->parent != NULL)
+    {
+        if (nd->parent->right == nd)
+        {
+            nd->parent->right = new_nd;
+        }
+        else
+        {
+            assert(nd->parent->left == nd);
+            nd->parent->left = new_nd;
+        }
+    }
+    new_nd->parent = nd->parent;
+    nd->parent     = new_nd;
+    nd->right      = new_nd->left;
+    if (nd->right != NULL)
+    {
+        nd->right->parent = nd;
+    }
+    new_nd->left = nd;
+    _cavlAdjustHeight(nd);
+    _cavlAdjustHeight(new_nd);
+    return new_nd;
+}
+
+static inline Cavl* _cavlBalance(Cavl* const nd)
+{
+    Cavl* out = nd;
+    if (_cavlGetBalance(nd) < -1)
+    {
+        if (_cavlGetBalance(nd->left) < 0)
+        {
+            out = _cavlRotateRight(nd);
+        }
+        else
+        {
+            (void) _cavlRotateLeft(nd->left);
+            out = _cavlRotateRight(nd);
+        }
+    }
+    else if (_cavlGetBalance(nd) > 1)
+    {
+        if (_cavlGetBalance(nd->right) > 0)
+        {
+            out = _cavlRotateLeft(nd);
+        }
+        else
+        {
+            (void) _cavlRotateRight(nd->right);
+            out = _cavlRotateLeft(nd);
+        }
+    }
+    else
+    {
+        (void) 0;  // Already balanced or empty.
+    }
+    return out;
+}
 
 #ifdef __cplusplus
 }
