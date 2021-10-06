@@ -1,10 +1,11 @@
-/// Cavl is a generic C implementation of AVL tree suitable for deeply embedded systems distributed as a single header.
-/// To integrate it into your project, simply copy the only header into your source tree.
+/// Source: https://github.com/pavel-kirienko/cavl
+/// Cavl is a single-header C library providing an implementation of AVL tree suitable for deeply embedded systems.
+/// To integrate it into your project, simply copy this file into your source tree.
 ///
 /// Cavl is best used with O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for
 /// hard-real-time high-integrity embedded systems.
 ///
-/// Copyright (c) 2021 Pavel Kirienko
+/// Copyright (c) 2021 Pavel Kirienko <pavel@uavcan.org>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 /// documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -22,6 +23,7 @@
 #pragma once
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -31,14 +33,15 @@ extern "C" {
 
 // ----------------------------------------         PUBLIC API SECTION         ----------------------------------------
 
-/// The tree node/root object. User types should put this item as the very first field or (in case of C++) inherit.
+/// The tree node/root. The user data is represented by a single untyped pointer.
+/// Per standard convention, nodes that compare smaLLer are put on the Left; those that are laRgeR are on the Right.
 typedef struct Cavl Cavl;
 struct Cavl
 {
-    Cavl*   parent;
-    Cavl*   left;
-    Cavl*   right;
-    uint8_t height;  ///< Limits the capacity at 2**255 nodes (over 10**76, an astronomical number).
+    void*  value;  ///< The user data stored in this node.
+    Cavl*  up;     ///< Parent node, NULL in the root.
+    Cavl*  lr[2];  ///< Left child (lesser), right child (greater).
+    int8_t bf;     ///< Balance factor is positive when right-heavy.
 };
 
 /// Returns positive if the search target is greater than the node value, negative if smaller, zero on match (found).
@@ -49,10 +52,7 @@ typedef int8_t CavlPredicate(void* user_reference, const Cavl* node);
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef Cavl* CavlFactory(void* user_reference);
 
-/// See cavlTraverse().
-typedef void CavlVisitor(void* user_reference, Cavl* node);
-
-/// Look for a node in the tree using the specified search predicate. Worst-case complexity is O(log n).
+/// Look for a node in the tree using the specified search predicate. Average/worst-case complexity is O(log n).
 /// - If the node is found, return it.
 /// - If the node is not found and the factory is NULL, return NULL.
 /// - If the node is not found and the factory is not NULL, construct a new node using the factory, insert & return it;
@@ -64,139 +64,117 @@ static inline Cavl* cavlSearch(Cavl** const         root,
                                CavlPredicate* const predicate,
                                CavlFactory* const   factory);
 
-/// Remove the specified node from its tree in constant time. No search is necessary.
-static inline void cavlRemove(Cavl* const node);
-
-/// Calls the visitor with each node in the specified order: ascending (in-order) or descending (reverse in-order).
-/// The node pointer passed to the visitor is guaranteed to be valid.
-/// The user_reference is passed into the visitor unmodified.
-/// No action is taken if root or visitor are NULL.
-static inline void cavlTraverse(Cavl* const        root,
-                                const bool         ascending,
-                                void* const        user_reference,
-                                CavlVisitor* const visitor)
-{
-    if ((root != NULL) && (visitor != NULL))
-    {
-        cavlTraverse(ascending ? root->left : root->right, ascending, user_reference, visitor);
-        visitor(user_reference, root);
-        cavlTraverse(ascending ? root->right : root->left, ascending, user_reference, visitor);
-    }
-}
-
+#if 0
+/// Remove the specified node from its tree in constant time. No search is necessary. The children will survive.
+/// No effect if either of the pointers are NULL.
+static inline void cavlRemove(Cavl** const root, Cavl* const node);
+#endif
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
-static inline uint8_t _cavlGetHeight(const Cavl* const nd)
+static inline Cavl* _cavlRotate(Cavl* const n, const bool r)
 {
-    return (nd != NULL) ? nd->height : 0;
-}
-
-static inline void _cavlAdjustHeight(Cavl* const nd)
-{
-    const uint8_t lf = _cavlGetHeight(nd->left);
-    const uint8_t rt = _cavlGetHeight(nd->right);
-    nd->height       = (uint8_t) (1U + ((lf > rt) ? lf : rt));
-}
-
-static inline int8_t _cavlGetBalance(const Cavl* const nd)
-{
-    int16_t bal = 0;
-    if (nd != NULL)
+    assert((n != NULL) && (n->lr[!r] != NULL));
+    Cavl* const x = n->lr[!r];
+    if (n->up != NULL)
     {
-        bal = (int16_t) ((int16_t) (_cavlGetHeight(nd->right)) - (int16_t) (_cavlGetHeight(nd->left)));
-        assert((bal >= -2) && (bal <= 2));
-    }
-    return (int8_t) bal;
-}
-
-static inline Cavl* _cavlRotateRight(Cavl* const nd)
-{
-    assert((nd != NULL) && (nd->left != NULL));
-    Cavl* const new_nd = nd->left;
-    if (nd->parent != NULL)
-    {
-        if (nd->parent->left == nd)
+        if (n->up->lr[!r] == n)
         {
-            nd->parent->left = new_nd;
+            n->up->lr[!r] = x;
         }
         else
         {
-            assert(nd->parent->right == nd);
-            nd->parent->right = new_nd;
+            assert(n->up->lr[r] == n);
+            n->up->lr[r] = x;
         }
     }
-    new_nd->parent = nd->parent;
-    nd->parent     = new_nd;
-    nd->left       = new_nd->right;
-    if (nd->left != NULL)
+    x->up     = n->up;
+    n->up     = x;
+    n->lr[!r] = x->lr[r];
+    if (n->lr[!r] != NULL)
     {
-        nd->left->parent = nd;
+        n->lr[!r]->up = n;
     }
-    new_nd->right = nd;
-    _cavlAdjustHeight(nd);
-    _cavlAdjustHeight(new_nd);
-    return new_nd;
+    x->lr[r]           = n;
+    const int8_t delta = r ? +1 : -1;
+    n->bf              = (int8_t) (n->bf + delta);
+    x->bf              = (int8_t) (x->bf + delta);
+    return x;
 }
 
-static inline Cavl* _cavlRotateLeft(Cavl* const nd)
+static inline Cavl* _cavlBalance(Cavl* const n)
 {
-    assert((nd != NULL) && (nd->right != NULL));
-    Cavl* const new_nd = nd->right;
-    if (nd->parent != NULL)
+    Cavl* out = n;
+    if ((n->bf < -1) || (n->bf > 1))  // The AVL invariant is bf in {-1, 0, +1}.
     {
-        if (nd->parent->right == nd)
+        const bool right = n->bf < 0;                // bf<0 if left-heavy --> right rotation is needed.
+        assert(n->lr[!right] != NULL);               // Heavy side cannot be empty.
+        if ((n->lr[!right]->bf > 0) == (n->bf > 0))  // Parent and child are heavy on the same side.
         {
-            nd->parent->right = new_nd;
+            out = _cavlRotate(n, right);
         }
-        else
+        else  // Otherwise, the child needs to be rotated in the opposite direction first.
         {
-            assert(nd->parent->left == nd);
-            nd->parent->left = new_nd;
+            (void) _cavlRotate(n->lr[!right], !right);
+            out = _cavlRotate(n, right);
         }
+        n->bf = (int8_t) (n->bf + (right ? +1 : -1));
     }
-    new_nd->parent = nd->parent;
-    nd->parent     = new_nd;
-    nd->right      = new_nd->left;
-    if (nd->right != NULL)
-    {
-        nd->right->parent = nd;
-    }
-    new_nd->left = nd;
-    _cavlAdjustHeight(nd);
-    _cavlAdjustHeight(new_nd);
-    return new_nd;
+    return out;
 }
 
-static inline Cavl* _cavlBalance(Cavl* const nd)
+static inline Cavl* cavlSearch(Cavl** const         root,
+                               void* const          user_reference,
+                               CavlPredicate* const predicate,
+                               CavlFactory* const   factory)
 {
-    Cavl* out = nd;
-    if (_cavlGetBalance(nd) < -1)
+    Cavl* out = NULL;
+    if ((root != NULL) && (predicate != NULL))
     {
-        if (_cavlGetBalance(nd->left) < 0)
+        Cavl*  up = *root;
+        Cavl** n  = root;
+        bool   r  = false;  // Left/right side selector.
+        while (*n != NULL)
         {
-            out = _cavlRotateRight(nd);
+            const int8_t cmp = predicate(user_reference, *n);
+            if (cmp == 0)
+            {
+                out = *n;
+                break;
+            }
+            r  = cmp > 0;
+            up = *n;
+            n  = &(*n)->lr[r];
+            assert((*n == NULL) || ((*n)->up == up));
         }
-        else
+        if (out == NULL)
         {
-            (void) _cavlRotateLeft(nd->left);
-            out = _cavlRotateRight(nd);
+            out = (factory == NULL) ? NULL : factory(user_reference);
+            if (out != NULL)
+            {
+                *n         = out;  // Overwrite the pointer to the new node in the parent node.
+                out->lr[0] = NULL;
+                out->lr[1] = NULL;
+                out->up    = up;
+                out->bf    = 0;
+                if (up != NULL)
+                {
+                    assert(up->lr[r] == out);
+                    up->bf = (int8_t) (up->bf + (r ? +1 : -1));  // New balance of the parent node.
+                    assert((up->bf == 0) || (up->bf == -2) || (up->bf == +2));
+                }
+                while ((up != NULL) && (up->bf != 0))
+                {
+                    const bool is_root = up == *root;
+                    up                 = _cavlBalance(up);
+                    if (is_root)
+                    {
+                        assert(up->up == NULL);  // Ensure the new root is indeed root.
+                        *root = up;
+                    }
+                    up = up->up;
+                }
+            }
         }
-    }
-    else if (_cavlGetBalance(nd) > 1)
-    {
-        if (_cavlGetBalance(nd->right) > 0)
-        {
-            out = _cavlRotateLeft(nd);
-        }
-        else
-        {
-            (void) _cavlRotateRight(nd->right);
-            out = _cavlRotateLeft(nd);
-        }
-    }
-    else
-    {
-        (void) 0;  // Already balanced or empty.
     }
     return out;
 }
