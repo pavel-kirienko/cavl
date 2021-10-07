@@ -270,6 +270,7 @@ void testRetracing()
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x50]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[0x50]));
     TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x10], +1));
+    std::puts("ADD 0x10:");
     print(&t[0x30]);  // This is the new root.
     TEST_ASSERT_EQUAL(&t[0x20], t[0x30].lr[0]);
     TEST_ASSERT_EQUAL(&t[0x50], t[0x30].lr[1]);
@@ -285,50 +286,95 @@ void testRetracing()
     TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x60].lr[1]);
     TEST_ASSERT_EQUAL(-1, t[0x20].bf);
     TEST_ASSERT_EQUAL(+0, t[0x30].bf);
-    TEST_ASSERT_NULL(findBrokenAncestry(&t[30]));
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[0x30]));
-    //          0x30
-    //         /   `
-    //       0x20   0x50
-    //       /      /  `
-    //     0x10   0x40 0x60
+    // Add a new child under 0x20 and ensure that retracing stops at 0x20 because it becomes perfectly balanced:
+    //
+    //           0x30
+    //         /      `
+    //       0x20      0x50
+    //       /  `      /  `
+    //     0x10 0x21 0x40 0x60
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    t[0x21]       = {reinterpret_cast<void*>(0x21), &t[0x20], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x20].lr[1] = &t[0x21];
+    TEST_ASSERT_NULL(_cavlRetrace(&t[0x21], +1));  // Root not reached, NULL returned.
+    std::puts("ADD 0x21:");
+    print(&t[0x30]);
+    TEST_ASSERT_EQUAL(0, t[0x20].bf);
+    TEST_ASSERT_EQUAL(0, t[0x30].bf);
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    TEST_ASSERT_EQUAL(7, checkAscension(&t[0x30]));
+    //           0x30
+    //          /    `
+    //       0x20     0x50
+    //       / `      /  `
+    //    0x10 0x21 0x40 0x60
     //       `
     //       0x15        <== first we add this, no balancing needed
     //         `
     //         0x17      <== then we add this, forcing left rotation at 0x10
     //
-    // After the left rotation done to restore balance, we get:
+    // After the left rotation of 0x10, we get:
     //
-    //          0x30
-    //         /   `
-    //       0x20   0x50
-    //       /      /  `
-    //     0x15   0x40 0x60
+    //           0x30
+    //          /    `
+    //       0x20     0x50
+    //       / `      /  `
+    //    0x15 0x21 0x40 0x60
     //     / `
     //   0x10 0x17
     //
-    // When we add one extra item after 0x17, we force a double rotation (0x15 left, 0x20 right):
+    // When we add one extra item after 0x17, we force a double rotation (0x15 left, 0x20 right). Before the rotation:
     //
-    //          0x30
-    //         /   `
-    //       0x20   0x50
-    //       /      /  `
-    //     0x15   0x40 0x60
+    //           0x30
+    //          /    `
+    //       0x20     0x50
+    //       / `      /  `
+    //    0x15 0x21 0x40 0x60
     //     / `
     //   0x10 0x17
     //          `
-    //          0x18
+    //          0x18    <== new item causes imbalance
     //
-    // The final configuration is:
+    // After left rotation of 0x15:
     //
-    //          0x20
-    //        /      `
-    //     0x17       0x30
-    //     / `        /  `
-    //   0x15 0x18  0x40 0x60
+    //           0x30
+    //         /       `
+    //       0x20      0x50
+    //       / `       /   `
+    //     0x17 0x21 0x40 0x60
+    //     / `
+    //   0x15 0x18
     //   /
-    //  0x10
+    // 0x10
+    //
+    // After right rotation of 0x20:
+    //
+    //           0x30
+    //         /       `
+    //       0x17      0x50
+    //       /  `      /   `
+    //    0x15  0x20 0x40 0x60
+    //    /     / `
+    //  0x10  0x18 0x21
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    TEST_ASSERT_EQUAL(7, checkAscension(&t[0x30]));
+    t[0x15]       = {reinterpret_cast<void*>(0x15), &t[0x10], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x10].lr[1] = &t[0x15];
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x15], +1));  // Same root, its balance becomes -1.
+    std::puts("ADD 0x15:");
+    print(&t[0x30]);
+    TEST_ASSERT_EQUAL(+1, t[0x10].bf);
+    TEST_ASSERT_EQUAL(-1, t[0x20].bf);
+    TEST_ASSERT_EQUAL(-1, t[0x30].bf);
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    TEST_ASSERT_EQUAL(8, checkAscension(&t[0x30]));
 }
 
 int8_t predicate(void* const value, const Cavl* const node)
