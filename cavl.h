@@ -127,17 +127,17 @@ static inline Cavl* _cavlBalance(Cavl* const n)
 }
 
 /// INTERNAL USE ONLY.
-/// Accepts the first node to start retracing from; returns NULL or the root of the tree (possibly new one).
-static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t subtree_growth)
+/// Takes the culprit node (the one that is added/removed); returns NULL or the root of the tree (possibly new one).
+static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t growth)
 {
-    assert((start != NULL) && ((subtree_growth == -1) || (subtree_growth == +1)));
+    assert((start != NULL) && ((growth == -1) || (growth == +1)));
     Cavl* c = start;      // Child
     Cavl* p = start->up;  // Parent
     while (p != NULL)
     {
         const bool r = p->lr[1] == c;  // c is the right child of parent
         assert(p->lr[r] == c);
-        p->bf = (int8_t) (p->bf + (r ? +subtree_growth : -subtree_growth));
+        p->bf = (int8_t) (p->bf + (r ? +growth : -growth));
         if (p->bf == 0)
         {
             break;  // The height change made this parent perfectly balanced, the height of this subtree is unchanged.

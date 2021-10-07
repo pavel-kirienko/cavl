@@ -37,6 +37,7 @@ Checks: >-
   -cppcoreguidelines-pro-type-union-access,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-pro-type-vararg,
+  -*-avoid-c-arrays,
   -*-no-malloc,
   -misc-no-recursion,
 WarningsAsErrors: '*'

@@ -13,22 +13,18 @@ void tearDown() {}
 
 namespace
 {
-constexpr auto Zz = nullptr;
+constexpr auto Zz       = nullptr;
+constexpr auto Zzzzzzzz = Zz;
 
 void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {
-    for (std::uint16_t i = 0U; i < depth; i++)
+    if (nd != nullptr)
     {
-        std::printf("    ");
-    }
-    std::printf("%c=", marker);
-    if (nd == nullptr)
-    {
-        std::printf("null\n");
-    }
-    else
-    {
-        std::printf("%p [%d]\n", nd->value, nd->bf);
+        for (std::uint16_t i = 0U; i < depth; i++)
+        {
+            std::printf("    ");
+        }
+        std::printf("%c=%p [%d]\n", marker, nd->value, nd->bf);
         print(nd->lr[0], depth + 1U, 'L');
         print(nd->lr[1], depth + 1U, 'R');
     }
@@ -250,13 +246,89 @@ void testBalancing()
 
 void testRetracing()
 {
-    //       A
-    //      / `
-    //     B   C?
-    //    / `
-    //   D   E?
-    //  /
-    // X    <== new node; D.bf = 0 before insertion
+    Cavl t[256]{};
+    //        0x50
+    //       /   `
+    //     0x30   0x60?
+    //     /  `
+    //   0x20 0x40?
+    //   /
+    // 0x10
+    // --------------------------------------------
+    //       0x30
+    //      /   `
+    //    0x20   0x50
+    //    /      /  `
+    //  0x10   0x40? 0x60?
+    t[0x50] = {reinterpret_cast<void*>(0x50), Zzzzzzzz, {&t[0x30], &t[0x60]}, -1};
+    t[0x30] = {reinterpret_cast<void*>(0x30), &t[0x50], {&t[0x20], &t[0x40]}, 0};
+    t[0x60] = {reinterpret_cast<void*>(0x60), &t[0x50], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x20] = {reinterpret_cast<void*>(0x20), &t[0x30], {&t[0x10], Zzzzzzzz}, 0};
+    t[0x40] = {reinterpret_cast<void*>(0x40), &t[0x30], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x10] = {reinterpret_cast<void*>(0x10), &t[0x20], {Zzzzzzzz, Zzzzzzzz}, 0};
+    print(&t[0x50]);  // The tree is imbalanced because we just added 1 and are about to retrace it.
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x50]));
+    TEST_ASSERT_EQUAL(6, checkAscension(&t[0x50]));
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x10], +1));
+    print(&t[0x30]);  // This is the new root.
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x30].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x50], t[0x30].lr[1]);
+    TEST_ASSERT_EQUAL(&t[0x10], t[0x20].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x20].lr[1]);
+    TEST_ASSERT_EQUAL(&t[0x40], t[0x50].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x60], t[0x50].lr[1]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x10].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x10].lr[1]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x40].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x40].lr[1]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x60].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzzzzz, t[0x60].lr[1]);
+    TEST_ASSERT_EQUAL(-1, t[0x20].bf);
+    TEST_ASSERT_EQUAL(+0, t[0x30].bf);
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
+    TEST_ASSERT_EQUAL(6, checkAscension(&t[0x30]));
+    //          0x30
+    //         /   `
+    //       0x20   0x50
+    //       /      /  `
+    //     0x10   0x40 0x60
+    //       `
+    //       0x15        <== first we add this, no balancing needed
+    //         `
+    //         0x17      <== then we add this, forcing left rotation at 0x10
+    //
+    // After the left rotation done to restore balance, we get:
+    //
+    //          0x30
+    //         /   `
+    //       0x20   0x50
+    //       /      /  `
+    //     0x15   0x40 0x60
+    //     / `
+    //   0x10 0x17
+    //
+    // When we add one extra item after 0x17, we force a double rotation (0x15 left, 0x20 right):
+    //
+    //          0x30
+    //         /   `
+    //       0x20   0x50
+    //       /      /  `
+    //     0x15   0x40 0x60
+    //     / `
+    //   0x10 0x17
+    //          `
+    //          0x18
+    //
+    // The final configuration is:
+    //
+    //          0x20
+    //        /      `
+    //     0x17       0x30
+    //     / `        /  `
+    //   0x15 0x18  0x40 0x60
+    //   /
+    //  0x10
 }
 
 int8_t predicate(void* const value, const Cavl* const node)
