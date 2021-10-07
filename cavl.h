@@ -45,12 +45,12 @@ struct Cavl
 };
 
 /// Returns positive if the search target is greater than the node value, negative if smaller, zero on match (found).
-typedef int8_t CavlPredicate(void* user_reference, const Cavl* node);
+typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
 
 /// If provided, the factory is invoked if the searched node could not be found.
 /// It is expected to return a new node that will be inserted immediately without the need to traverse the tree again.
 /// If the factory returns NULL or is not provided, the tree is not modified.
-typedef Cavl* CavlFactory(void* user_reference);
+typedef Cavl* (*CavlFactory)(void* user_reference);
 
 /// Look for a node in the tree using the specified search predicate. Average/worst-case complexity is O(log n).
 /// - If the node is found, return it.
@@ -59,18 +59,21 @@ typedef Cavl* CavlFactory(void* user_reference);
 ///   if the factory returned NULL, behave as if factory was NULL.
 /// The user_reference is passed into the functions unmodified.
 /// If predicate is NULL, returns NULL.
-static inline Cavl* cavlSearch(Cavl** const         root,
-                               void* const          user_reference,
-                               CavlPredicate* const predicate,
-                               CavlFactory* const   factory);
+static inline Cavl* cavlSearch(Cavl** const        root,
+                               void* const         user_reference,
+                               const CavlPredicate predicate,
+                               const CavlFactory   factory);
 
 #if 0
 /// Remove the specified node from its tree in constant time. No search is necessary. The children will survive.
 /// No effect if either of the pointers are NULL.
 static inline void cavlRemove(Cavl** const root, Cavl* const node);
 #endif
+
+// ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
+/// INTERNAL USE ONLY.
 static inline Cavl* _cavlRotate(Cavl* const n, const bool r)
 {
     assert((n != NULL) && (n->lr[!r] != NULL));
@@ -101,10 +104,11 @@ static inline Cavl* _cavlRotate(Cavl* const n, const bool r)
     return x;
 }
 
+/// INTERNAL USE ONLY. Returns the new node to replace the old one if balancing took place, same node otherwise.
 static inline Cavl* _cavlBalance(Cavl* const n)
 {
     Cavl* out = n;
-    if ((n->bf < -1) || (n->bf > 1))  // The AVL invariant is bf in {-1, 0, +1}.
+    if ((n != NULL) && ((n->bf < -1) || (n->bf > 1)))  // The AVL invariant is bf in {-1, 0, +1}.
     {
         const bool right = n->bf < 0;                // bf<0 if left-heavy --> right rotation is needed.
         assert(n->lr[!right] != NULL);               // Heavy side cannot be empty.
@@ -117,22 +121,44 @@ static inline Cavl* _cavlBalance(Cavl* const n)
             (void) _cavlRotate(n->lr[!right], !right);
             out = _cavlRotate(n, right);
         }
-        n->bf = (int8_t) (n->bf + (right ? +1 : -1));
+        n->bf = (int8_t) (n->bf + (right ? +1 : -1));  // One extra adjustment.
     }
     return out;
 }
 
-static inline Cavl* cavlSearch(Cavl** const         root,
-                               void* const          user_reference,
-                               CavlPredicate* const predicate,
-                               CavlFactory* const   factory)
+/// INTERNAL USE ONLY.
+/// Accepts the first node to start retracing from; returns NULL or the root of the tree (possibly new one).
+static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t subtree_growth)
+{
+    assert((start != NULL) && ((subtree_growth == -1) || (subtree_growth == +1)));
+    Cavl* c = start;      // Child
+    Cavl* p = start->up;  // Parent
+    while (p != NULL)
+    {
+        const bool r = p->lr[1] == c;  // c is the right child of parent
+        assert(p->lr[r] == c);
+        p->bf = (int8_t) (p->bf + (r ? +subtree_growth : -subtree_growth));
+        if (p->bf == 0)
+        {
+            break;  // The height change made this parent perfectly balanced, the height of this subtree is unchanged.
+        }
+        c = _cavlBalance(p);  // Balance and move up the tree, the parent is now child of grandparent.
+        p = c->up;
+    }
+    assert(c != NULL);
+    return (p == NULL) ? c : NULL;  // New root or nothing.
+}
+
+static inline Cavl* cavlSearch(Cavl** const        root,
+                               void* const         user_reference,
+                               const CavlPredicate predicate,
+                               const CavlFactory   factory)
 {
     Cavl* out = NULL;
     if ((root != NULL) && (predicate != NULL))
     {
         Cavl*  up = *root;
         Cavl** n  = root;
-        bool   r  = false;  // Left/right side selector.
         while (*n != NULL)
         {
             const int8_t cmp = predicate(user_reference, *n);
@@ -141,9 +167,8 @@ static inline Cavl* cavlSearch(Cavl** const         root,
                 out = *n;
                 break;
             }
-            r  = cmp > 0;
             up = *n;
-            n  = &(*n)->lr[r];
+            n  = &(*n)->lr[cmp > 0];
             assert((*n == NULL) || ((*n)->up == up));
         }
         if (out == NULL)
@@ -151,27 +176,15 @@ static inline Cavl* cavlSearch(Cavl** const         root,
             out = (factory == NULL) ? NULL : factory(user_reference);
             if (out != NULL)
             {
-                *n         = out;  // Overwrite the pointer to the new node in the parent node.
-                out->lr[0] = NULL;
-                out->lr[1] = NULL;
-                out->up    = up;
-                out->bf    = 0;
-                if (up != NULL)
+                *n             = out;  // Overwrite the pointer to the new node in the parent node.
+                out->lr[0]     = NULL;
+                out->lr[1]     = NULL;
+                out->up        = up;
+                out->bf        = 0;
+                Cavl* const rt = _cavlRetrace(out, +1);
+                if (rt != NULL)
                 {
-                    assert(up->lr[r] == out);
-                    up->bf = (int8_t) (up->bf + (r ? +1 : -1));  // New balance of the parent node.
-                    assert((up->bf == 0) || (up->bf == -2) || (up->bf == +2));
-                }
-                while ((up != NULL) && (up->bf != 0))
-                {
-                    const bool is_root = up == *root;
-                    up                 = _cavlBalance(up);
-                    if (is_root)
-                    {
-                        assert(up->up == NULL);  // Ensure the new root is indeed root.
-                        *root = up;
-                    }
-                    up = up->up;
+                    *root = rt;
                 }
             }
         }

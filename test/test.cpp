@@ -1,37 +1,34 @@
 /// Copyright (c) 2021 Pavel Kirienko <pavel@uavcan.org>
 
-#include "cavl.h"
+#include "../cavl.h"
+#include <unity.h>
 #include <algorithm>
 #include <cstdio>
-#include <iostream>
+#include <cstdint>
+#include <optional>
 
-// NOLINTNEXTLINE
-#define ENFORCE(...)                                                                          \
-    do                                                                                        \
-    {                                                                                         \
-        if (!bool(__VA_ARGS__))                                                               \
-        {                                                                                     \
-            std::cerr << "Assertion failure at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            std::exit(1);                                                                     \
-        }                                                                                     \
-    } while (false)
+void setUp() {}
+
+void tearDown() {}
 
 namespace
 {
+constexpr auto Zz = nullptr;
+
 void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {
     for (std::uint16_t i = 0U; i < depth; i++)
     {
-        std::cout << "    ";
+        std::printf("    ");
     }
-    std::cout << marker << "=";
+    std::printf("%c=", marker);
     if (nd == nullptr)
     {
-        std::cout << "null\n";
+        std::printf("null\n");
     }
     else
     {
-        std::cout << nd->value << " [" << int(nd->bf) << "]\n";
+        std::printf("%p [%d]\n", nd->value, nd->bf);
         print(nd->lr[0], depth + 1U, 'L');
         print(nd->lr[1], depth + 1U, 'R');
     }
@@ -48,7 +45,7 @@ inline void traverse(Node* const root, const Visitor& visitor)
     }
 }
 
-std::pair<bool, std::size_t> checkAscension(const Cavl* const root)
+std::optional<std::size_t> checkAscension(const Cavl* const root)
 {
     const Cavl* prev  = nullptr;
     bool        valid = true;
@@ -61,7 +58,7 @@ std::pair<bool, std::size_t> checkAscension(const Cavl* const root)
         prev = nd;
         size++;
     });
-    return {valid, size};
+    return valid ? std::optional<std::size_t>(size) : std::optional<std::size_t>{};
 }
 
 const Cavl* findBrokenAncestry(const Cavl* const n, const Cavl* const parent = nullptr)
@@ -82,11 +79,7 @@ const Cavl* findBrokenAncestry(const Cavl* const n, const Cavl* const parent = n
 
 std::uint8_t getHeight(const Cavl* const n)
 {
-    if (n != nullptr)
-    {
-        return std::uint8_t(1U + std::max(getHeight(n->lr[0]), getHeight(n->lr[1])));
-    }
-    return 0;
+    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(n->lr[0]), getHeight(n->lr[1]))) : 0;
 }
 
 const Cavl* findBrokenBalanceFactor(const Cavl* const n)
@@ -124,17 +117,17 @@ void testCheckAscension()
     t.lr[0] = &l;
     t.lr[1] = &r;
     r.lr[1] = &rr;
-    ENFORCE(checkAscension(&t) == std::pair<bool, std::size_t>{true, 4});
-    ENFORCE(getHeight(&t) == 3);
+    TEST_ASSERT_EQUAL(4, checkAscension(&t));
+    TEST_ASSERT_EQUAL(3, getHeight(&t));
     // Break the arrangement and make sure the breakage is detected.
     t.lr[1] = &l;
     t.lr[0] = &r;
-    ENFORCE(checkAscension(&t) == std::pair<bool, std::size_t>{false, 4});
-    ENFORCE(getHeight(&t) == 3);
-    ENFORCE(&t == findBrokenBalanceFactor(&t));  // All zeros, incorrect.
+    TEST_ASSERT_NOT_EQUAL(4, checkAscension(&t));
+    TEST_ASSERT_EQUAL(3, getHeight(&t));
+    TEST_ASSERT_EQUAL(&t, findBrokenBalanceFactor(&t));  // All zeros, incorrect.
     r.lr[1] = nullptr;
-    ENFORCE(getHeight(&t) == 2);
-    ENFORCE(nullptr == findBrokenBalanceFactor(&t));  // Balanced now as we removed one node.
+    TEST_ASSERT_EQUAL(2, getHeight(&t));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&t));  // Balanced now as we removed one node.
 }
 
 void testRotation()
@@ -149,7 +142,6 @@ void testRotation()
     //      x.right = b
     //      z.left  = x
     //      z.right = c
-    auto Zz = nullptr;
     Cavl c{reinterpret_cast<void*>(3), Zz, {Zz, Zz}, 0};
     Cavl b{reinterpret_cast<void*>(2), Zz, {Zz, Zz}, 0};
     Cavl a{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, 0};
@@ -160,35 +152,34 @@ void testRotation()
     b.up = &z;
     a.up = &x;
 
-    std::cout << "Before rotation:\n";
-    ENFORCE(nullptr == findBrokenAncestry(&x));
-    ENFORCE(nullptr == findBrokenBalanceFactor(&x));
+    std::printf("Before rotation:\n");
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&x));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&x));
     print(&x);
 
-    std::cout << "After left rotation:\n";
-    ENFORCE(&z == _cavlRotate(&x, false));
-    ENFORCE(nullptr == findBrokenAncestry(&z));
-    ENFORCE(nullptr == findBrokenBalanceFactor(&z));
+    std::printf("After left rotation:\n");
+    TEST_ASSERT_EQUAL(&z, _cavlRotate(&x, false));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&z));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&z));
     print(&z);
-    ENFORCE(x.lr[0] == &a);
-    ENFORCE(x.lr[1] == &b);
-    ENFORCE(z.lr[0] == &x);
-    ENFORCE(z.lr[1] == &c);
+    TEST_ASSERT_EQUAL(&a, x.lr[0]);
+    TEST_ASSERT_EQUAL(&b, x.lr[1]);
+    TEST_ASSERT_EQUAL(&x, z.lr[0]);
+    TEST_ASSERT_EQUAL(&c, z.lr[1]);
 
-    std::cout << "After right rotation, back into the original configuration:\n";
-    ENFORCE(&x == _cavlRotate(&z, true));
-    ENFORCE(nullptr == findBrokenAncestry(&x));
-    ENFORCE(nullptr == findBrokenBalanceFactor(&x));
+    std::printf("After right rotation, back into the original configuration:\n");
+    TEST_ASSERT_EQUAL(&x, _cavlRotate(&z, true));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&x));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&x));
     print(&x);
-    ENFORCE(x.lr[0] == &a);
-    ENFORCE(x.lr[1] == &z);
-    ENFORCE(z.lr[0] == &b);
-    ENFORCE(z.lr[1] == &c);
+    TEST_ASSERT_EQUAL(&a, x.lr[0]);
+    TEST_ASSERT_EQUAL(&z, x.lr[1]);
+    TEST_ASSERT_EQUAL(&b, z.lr[0]);
+    TEST_ASSERT_EQUAL(&c, z.lr[1]);
 }
 
 void testBalancing()
 {
-    auto Zz = nullptr;
     //     A             A           E
     //    / `           / `        /   `
     //   B   C?  =>    E   C? =>  B     A
@@ -209,30 +200,29 @@ void testBalancing()
     b.lr[1] = &e;
     e.lr[0] = &f;
     e.lr[1] = &g;
-    std::cout << "Before balancing:" << std::endl;
+    std::printf("Before balancing:");
     print(&a);
-    ENFORCE(nullptr == findBrokenBalanceFactor(&a));
-    ENFORCE(nullptr == findBrokenAncestry(&a));
-    std::cout << "After balancing:" << std::endl;
-    ENFORCE(&e == _cavlBalance(&a));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
+    std::printf("After balancing:");
+    TEST_ASSERT_EQUAL(&e, _cavlBalance(&a));
     print(&e);
-    ENFORCE(nullptr == findBrokenBalanceFactor(&e));
-    ENFORCE(nullptr == findBrokenAncestry(&e));
-    ENFORCE(e.lr[0] == &b);
-    ENFORCE(e.lr[1] == &a);
-    ENFORCE(b.lr[0] == &d);
-    ENFORCE(b.lr[1] == &f);
-    ENFORCE(a.lr[0] == &g);
-    ENFORCE(a.lr[1] == &c);
-    ENFORCE(d.lr[0] == nullptr);
-    ENFORCE(d.lr[1] == nullptr);
-    ENFORCE(f.lr[0] == nullptr);
-    ENFORCE(f.lr[1] == nullptr);
-    ENFORCE(g.lr[0] == nullptr);
-    ENFORCE(g.lr[1] == nullptr);
-    ENFORCE(c.lr[0] == nullptr);
-    ENFORCE(c.lr[1] == nullptr);
-
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&e));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&e));
+    TEST_ASSERT_EQUAL(&b, e.lr[0]);
+    TEST_ASSERT_EQUAL(&a, e.lr[1]);
+    TEST_ASSERT_EQUAL(&d, b.lr[0]);
+    TEST_ASSERT_EQUAL(&f, b.lr[1]);
+    TEST_ASSERT_EQUAL(&g, a.lr[0]);
+    TEST_ASSERT_EQUAL(&c, a.lr[1]);
+    TEST_ASSERT_EQUAL(Zz, d.lr[0]);
+    TEST_ASSERT_EQUAL(Zz, d.lr[1]);
+    TEST_ASSERT_EQUAL(Zz, f.lr[0]);
+    TEST_ASSERT_EQUAL(Zz, f.lr[1]);
+    TEST_ASSERT_EQUAL(Zz, g.lr[0]);
+    TEST_ASSERT_EQUAL(Zz, g.lr[1]);
+    TEST_ASSERT_EQUAL(Zz, c.lr[0]);
+    TEST_ASSERT_EQUAL(Zz, c.lr[1]);
     //       A              B
     //      / `           /   `
     //     B   C?  =>    D     A
@@ -247,25 +237,61 @@ void testBalancing()
     e = {e.value, &b, {Zz, Zz}, 0};
     f = {f.value, &d, {Zz, Zz}, 0};
     g = {g.value, &d, {Zz, Zz}, 0};
-    std::cout << "Before balancing:" << std::endl;
+    std::printf("Before balancing:");
     print(&a);
-    ENFORCE(nullptr == findBrokenBalanceFactor(&a));
-    ENFORCE(nullptr == findBrokenAncestry(&a));
-    std::cout << "After balancing:" << std::endl;
-    ENFORCE(&b == _cavlBalance(&a));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
+    std::printf("After balancing:");
+    TEST_ASSERT_EQUAL(&b, _cavlBalance(&a));
     print(&b);
-    ENFORCE(nullptr == findBrokenBalanceFactor(&b));
-    ENFORCE(nullptr == findBrokenAncestry(&b));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&b));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&b));
+}
+
+void testRetracing()
+{
+    //       A
+    //      / `
+    //     B   C?
+    //    / `
+    //   D   E?
+    //  /
+    // X    <== new node; D.bf = 0 before insertion
+}
+
+void testSearch()
+{
+    //      A
+    //    B   C
+    //   D E F G
+    Cavl a{};
+    Cavl b{};
+    Cavl c{};
+    Cavl d{};
+    Cavl e{};
+    Cavl f{};
+    Cavl g{};
+    a = {reinterpret_cast<void*>(4), Zz, {&b, &c}, 0};
+    b = {reinterpret_cast<void*>(2), &a, {&d, &e}, 0};
+    c = {reinterpret_cast<void*>(6), &a, {&f, &g}, 0};
+    d = {reinterpret_cast<void*>(1), &b, {Zz, Zz}, 0};
+    e = {reinterpret_cast<void*>(3), &b, {Zz, Zz}, 0};
+    f = {reinterpret_cast<void*>(5), &c, {Zz, Zz}, 0};
+    g = {reinterpret_cast<void*>(7), &c, {Zz, Zz}, 0};
+    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
+    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
+    TEST_ASSERT(7 == checkAscension(&a));
 }
 
 }  // namespace
 
 int main()
 {
-    testCheckAscension();
-    std::cout << "\n-----\n";
-    testRotation();
-    std::cout << "\n-----\n";
-    testBalancing();
-    return 0;
+    UNITY_BEGIN();
+    RUN_TEST(testCheckAscension);
+    RUN_TEST(testRotation);
+    RUN_TEST(testBalancing);
+    RUN_TEST(testRetracing);
+    RUN_TEST(testSearch);
+    return UNITY_END();
 }

@@ -3,7 +3,7 @@
 # Author: Pavel Kirienko <pavel@uavcan.org>
 
 cmake_minimum_required(VERSION 3.12)
-project(cavl_tests CXX)
+project(cavl_tests C CXX)
 enable_testing()
 
 set(CTEST_OUTPUT_ON_FAILURE ON)
@@ -22,12 +22,15 @@ find_program(clang_format NAMES clang-format-12 clang-format)
 if (NOT clang_format)
     message(STATUS "Could not locate clang-format")
 else ()
-    file(GLOB format_files ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch]pp ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch])
+    file(GLOB format_files ${CMAKE_CURRENT_SOURCE_DIR}/cavl.h ${CMAKE_CURRENT_SOURCE_DIR}/test/*.[ch])
     message(STATUS "Using clang-format: ${clang_format}; files: ${format_files}")
     add_custom_target(format COMMAND ${clang_format} -i -fallback-style=none -style=file --verbose ${format_files})
 endif ()
 
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -pedantic -fstrict-aliasing")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdouble-promotion -Wswitch-enum -Wfloat-equal -Wundef")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion -Wsign-promo")
@@ -35,5 +38,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wcast-align -Wmissing
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wtype-limits -Wzero-as-null-pointer-constant -Wnon-virtual-dtor")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Woverloaded-virtual -Wsign-promo -Wold-style-cast")
 
-add_executable(cavl_test test.cpp)
-add_test("run_cavl_test" "cavl_test" --rng-seed time)
+add_library(unity STATIC ${CMAKE_CURRENT_SOURCE_DIR}/test/unity/unity.c)
+target_include_directories(unity SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/test/unity)
+
+add_executable(cavl_test ${CMAKE_CURRENT_SOURCE_DIR}/test/test.cpp)
+target_link_libraries(cavl_test unity)
+target_compile_definitions(cavl_test PUBLIC -DUNITY_SHORTHAND_AS_RAW=1)
+
+add_test("run_cavl_test" "cavl_test")
