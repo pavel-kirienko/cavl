@@ -122,6 +122,7 @@ static inline Cavl* _cavlBalance(Cavl* const n)
             out = _cavlRotate(n, right);
         }
         n->bf = (int8_t) (n->bf + (right ? +1 : -1));  // One extra adjustment.
+        assert(n->bf == 0);
     }
     return out;
 }

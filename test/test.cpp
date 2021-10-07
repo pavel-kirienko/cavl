@@ -410,6 +410,12 @@ void testRetracing()
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     TEST_ASSERT_EQUAL(9, checkAscension(&t[0x30]));
+
+    std::puts("ADD 0x18:");
+    t[0x18]       = {reinterpret_cast<void*>(0x18), &t[0x17], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x17].lr[1] = &t[0x18];
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x18], +1));  // Same root, 0x15 left, 0x20 right.
+    print(&t[0x30]);
 }
 
 int8_t predicate(void* const value, const Cavl* const node)
