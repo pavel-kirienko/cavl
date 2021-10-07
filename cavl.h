@@ -128,6 +128,7 @@ static inline Cavl* _cavlBalance(Cavl* const n)
 
 /// INTERNAL USE ONLY.
 /// Takes the culprit node (the one that is added/removed); returns NULL or the root of the tree (possibly new one).
+/// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
 static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t growth)
 {
     assert((start != NULL) && ((growth == -1) || (growth == +1)));
@@ -138,12 +139,13 @@ static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t growth)
         const bool r = p->lr[1] == c;  // c is the right child of parent
         assert(p->lr[r] == c);
         p->bf = (int8_t) (p->bf + (r ? +growth : -growth));
-        if (p->bf == 0)
-        {
-            break;  // The height change made this parent perfectly balanced, the height of this subtree is unchanged.
+        p     = _cavlBalance(p);
+        c     = p;
+        p     = c->up;
+        if (c->bf == 0)
+        {           // The height change of the subtree made this parent perfectly balanced (as all things should be),
+            break;  // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
         }
-        c = _cavlBalance(p);  // Balance and move up the tree, the parent is now child of grandparent.
-        p = c->up;
     }
     assert(c != NULL);
     return (p == NULL) ? c : NULL;  // New root or nothing.

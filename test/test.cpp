@@ -356,18 +356,18 @@ void testRetracing()
     //
     //           0x30
     //         /       `
-    //       0x17      0x50
-    //       /  `      /   `
-    //    0x15  0x20 0x40 0x60
+    //       0x17       0x50
+    //       /  `       /   `
+    //    0x15  0x20  0x40 0x60
     //    /     / `
     //  0x10  0x18 0x21
+    std::puts("ADD 0x15:");
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     TEST_ASSERT_EQUAL(7, checkAscension(&t[0x30]));
     t[0x15]       = {reinterpret_cast<void*>(0x15), &t[0x10], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x10].lr[1] = &t[0x15];
     TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x15], +1));  // Same root, its balance becomes -1.
-    std::puts("ADD 0x15:");
     print(&t[0x30]);
     TEST_ASSERT_EQUAL(+1, t[0x10].bf);
     TEST_ASSERT_EQUAL(-1, t[0x20].bf);
@@ -375,6 +375,41 @@ void testRetracing()
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     TEST_ASSERT_EQUAL(8, checkAscension(&t[0x30]));
+
+    std::puts("ADD 0x17:");
+    t[0x17]       = {reinterpret_cast<void*>(0x17), &t[0x15], {Zzzzzzzz, Zzzzzzzz}, 0};
+    t[0x15].lr[1] = &t[0x17];
+    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x17], +1));  // Same root, same balance, 0x10 rotated left.
+    print(&t[0x30]);
+    // Check 0x10
+    TEST_ASSERT_EQUAL(&t[0x15], t[0x10].up);
+    TEST_ASSERT_EQUAL(0, t[0x10].bf);
+    TEST_ASSERT_EQUAL(nullptr, t[0x10].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x10].lr[1]);
+    // Check 0x17
+    TEST_ASSERT_EQUAL(&t[0x15], t[0x17].up);
+    TEST_ASSERT_EQUAL(0, t[0x17].bf);
+    TEST_ASSERT_EQUAL(nullptr, t[0x17].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x17].lr[1]);
+    // Check 0x15
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x15].up);
+    TEST_ASSERT_EQUAL(0, t[0x15].bf);
+    TEST_ASSERT_EQUAL(&t[0x10], t[0x15].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x17], t[0x15].lr[1]);
+    // Check 0x20 -- leaning left
+    TEST_ASSERT_EQUAL(&t[0x30], t[0x20].up);
+    TEST_ASSERT_EQUAL(-1, t[0x20].bf);
+    TEST_ASSERT_EQUAL(&t[0x15], t[0x20].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x21], t[0x20].lr[1]);
+    // Check the root -- still leaning left by one.
+    TEST_ASSERT_EQUAL(nullptr, t[0x30].up);
+    TEST_ASSERT_EQUAL(-1, t[0x30].bf);
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x30].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x50], t[0x30].lr[1]);
+    //
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    TEST_ASSERT_EQUAL(9, checkAscension(&t[0x30]));
 }
 
 int8_t predicate(void* const value, const Cavl* const node)
