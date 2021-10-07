@@ -127,7 +127,7 @@ void testCheckAscension()
     TEST_ASSERT_EQUAL(&t, findBrokenBalanceFactor(&t));  // All zeros, incorrect.
     r.lr[1] = nullptr;
     TEST_ASSERT_EQUAL(2, getHeight(&t));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&t));  // Balanced now as we removed one node.
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t));  // Balanced now as we removed one node.
 }
 
 void testRotation()
@@ -153,14 +153,14 @@ void testRotation()
     a.up = &x;
 
     std::printf("Before rotation:\n");
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&x));
+    TEST_ASSERT_NULL(findBrokenAncestry(&x));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     print(&x);
 
     std::printf("After left rotation:\n");
     TEST_ASSERT_EQUAL(&z, _cavlRotate(&x, false));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&z));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&z));
+    TEST_ASSERT_NULL(findBrokenAncestry(&z));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&z));
     print(&z);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
     TEST_ASSERT_EQUAL(&b, x.lr[1]);
@@ -169,8 +169,8 @@ void testRotation()
 
     std::printf("After right rotation, back into the original configuration:\n");
     TEST_ASSERT_EQUAL(&x, _cavlRotate(&z, true));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&x));
+    TEST_ASSERT_NULL(findBrokenAncestry(&x));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     print(&x);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
     TEST_ASSERT_EQUAL(&z, x.lr[1]);
@@ -202,13 +202,13 @@ void testBalancing()
     e.lr[1] = &g;
     std::printf("Before balancing:");
     print(&a);
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&a));
+    TEST_ASSERT_NULL(findBrokenAncestry(&a));
     std::printf("After balancing:");
     TEST_ASSERT_EQUAL(&e, _cavlBalance(&a));
     print(&e);
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&e));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&e));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&e));
+    TEST_ASSERT_NULL(findBrokenAncestry(&e));
     TEST_ASSERT_EQUAL(&b, e.lr[0]);
     TEST_ASSERT_EQUAL(&a, e.lr[1]);
     TEST_ASSERT_EQUAL(&d, b.lr[0]);
@@ -239,13 +239,13 @@ void testBalancing()
     g = {g.value, &d, {Zz, Zz}, 0};
     std::printf("Before balancing:");
     print(&a);
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&a));
+    TEST_ASSERT_NULL(findBrokenAncestry(&a));
     std::printf("After balancing:");
     TEST_ASSERT_EQUAL(&b, _cavlBalance(&a));
     print(&b);
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&b));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&b));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&b));
+    TEST_ASSERT_NULL(findBrokenAncestry(&b));
 }
 
 void testRetracing()
@@ -257,6 +257,19 @@ void testRetracing()
     //   D   E?
     //  /
     // X    <== new node; D.bf = 0 before insertion
+}
+
+int8_t predicate(void* const value, const Cavl* const node)
+{
+    if (value > node->value)
+    {
+        return +1;
+    }
+    if (value < node->value)
+    {
+        return -1;
+    }
+    return 0;
 }
 
 void testSearch()
@@ -278,9 +291,17 @@ void testSearch()
     e = {reinterpret_cast<void*>(3), &b, {Zz, Zz}, 0};
     f = {reinterpret_cast<void*>(5), &c, {Zz, Zz}, 0};
     g = {reinterpret_cast<void*>(7), &c, {Zz, Zz}, 0};
-    TEST_ASSERT_EQUAL(nullptr, findBrokenBalanceFactor(&a));
-    TEST_ASSERT_EQUAL(nullptr, findBrokenAncestry(&a));
-    TEST_ASSERT(7 == checkAscension(&a));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&a));
+    TEST_ASSERT_NULL(findBrokenAncestry(&a));
+    TEST_ASSERT_EQUAL(7, checkAscension(&a));
+    Cavl* root = &a;
+    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, nullptr, nullptr));         // Bad arguments.
+    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
+    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, predicate, nullptr));       // Item not found.
+    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
+    TEST_ASSERT_EQUAL(&e, cavlSearch(&root, e.value, predicate, nullptr));  // Item found.
+    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
+    print(&a);
 }
 
 }  // namespace
