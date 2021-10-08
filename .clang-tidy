@@ -19,6 +19,7 @@ Checks: >-
   -hicpp-function-size,
   -hicpp-no-array-decay,
   -hicpp-vararg,
+  -hicpp-use-auto,
   -google-readability-todo,
   -google-runtime-references,
   -google-readability-function-size,

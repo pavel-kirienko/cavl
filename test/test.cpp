@@ -181,13 +181,13 @@ void testBalancingA()
     // D   Y         Z   G      D   F G   C
     //    / `       / `
     //   F   G     D   F
-    Cavl x{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, -2};
-    Cavl z{reinterpret_cast<void*>(2), &x, {Zz, Zz}, +1};
-    Cavl c{reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
-    Cavl d{reinterpret_cast<void*>(4), &z, {Zz, Zz}, 00};
-    Cavl y{reinterpret_cast<void*>(5), &z, {Zz, Zz}, 00};
-    Cavl f{reinterpret_cast<void*>(6), &y, {Zz, Zz}, 00};
-    Cavl g{reinterpret_cast<void*>(7), &y, {Zz, Zz}, 00};
+    Cavl x{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, 0};  // bf = -2
+    Cavl z{reinterpret_cast<void*>(2), &x, {Zz, Zz}, 0};  // bf = +1
+    Cavl c{reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
+    Cavl d{reinterpret_cast<void*>(4), &z, {Zz, Zz}, 0};
+    Cavl y{reinterpret_cast<void*>(5), &z, {Zz, Zz}, 0};
+    Cavl f{reinterpret_cast<void*>(6), &y, {Zz, Zz}, 0};
+    Cavl g{reinterpret_cast<void*>(7), &y, {Zz, Zz}, 0};
     x.lr[0] = &z;
     x.lr[1] = &c;
     z.lr[0] = &d;
@@ -195,11 +195,14 @@ void testBalancingA()
     y.lr[0] = &f;
     y.lr[1] = &g;
     print(&x);
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&y, _cavlBalance(&x));
+    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(-1, x.bf);
+    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(+1, z.bf);
+    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&x, false));  // bf = -2, rotation needed
     print(&y);
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));  // Should be balanced now.
     TEST_ASSERT_NULL(findBrokenAncestry(&y));
     TEST_ASSERT_EQUAL(&z, y.lr[0]);
     TEST_ASSERT_EQUAL(&x, y.lr[1]);
@@ -233,18 +236,23 @@ void testBalancingB()
     Cavl d{};
     Cavl y{};
     Cavl g{};
-    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, -2};
-    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, +1};
-    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
-    d = {reinterpret_cast<void*>(4), &z, {Zz, Zz}, 00};
-    y = {reinterpret_cast<void*>(5), &z, {Zz, &g}, +1};
-    g = {reinterpret_cast<void*>(7), &y, {Zz, Zz}, 00};
+    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, 0};  // bf = -2
+    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, 0};  // bf = +1
+    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
+    d = {reinterpret_cast<void*>(4), &z, {Zz, Zz}, 0};
+    y = {reinterpret_cast<void*>(5), &z, {Zz, &g}, 0};  // bf = +1
+    g = {reinterpret_cast<void*>(7), &y, {Zz, Zz}, 0};
     print(&x);
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&y, _cavlBalance(&x));
+    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(-1, x.bf);
+    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(+1, z.bf);
+    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&y, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(+1, y.bf);
+    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&x, false));  // bf = -2, rotation needed
     print(&y);
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));  // Should be balanced now.
     TEST_ASSERT_NULL(findBrokenAncestry(&y));
     TEST_ASSERT_EQUAL(&z, y.lr[0]);
     TEST_ASSERT_EQUAL(&x, y.lr[1]);
@@ -277,17 +285,20 @@ void testBalancingC()
     Cavl y{};
     Cavl f{};
     Cavl g{};
-    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, -2};
-    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, -1};
-    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
-    d = {reinterpret_cast<void*>(4), &z, {&f, &g}, 00};
-    y = {reinterpret_cast<void*>(5), &z, {Zz, Zz}, 00};
-    f = {reinterpret_cast<void*>(6), &d, {Zz, Zz}, 00};
-    g = {reinterpret_cast<void*>(7), &d, {Zz, Zz}, 00};
+    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, 0};  // bf = -2
+    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, 0};  // bf = -1
+    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
+    d = {reinterpret_cast<void*>(4), &z, {&f, &g}, 0};
+    y = {reinterpret_cast<void*>(5), &z, {Zz, Zz}, 0};
+    f = {reinterpret_cast<void*>(6), &d, {Zz, Zz}, 0};
+    g = {reinterpret_cast<void*>(7), &d, {Zz, Zz}, 0};
     print(&x);
-    TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&z, _cavlBalance(&x));
+    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(-1, x.bf);
+    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(-1, z.bf);
+    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&x, false));
     print(&z);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&z));
     TEST_ASSERT_NULL(findBrokenAncestry(&z));
@@ -326,7 +337,7 @@ void testRetracing()
     print(&t[0x50]);  // The tree is imbalanced because we just added 1 and are about to retrace it.
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x50]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[0x50]));
-    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x10], +1));
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x10], true));
     std::puts("ADD 0x10:");
     print(&t[0x30]);  // This is the new root.
     TEST_ASSERT_EQUAL(&t[0x20], t[0x30].lr[0]);
@@ -357,7 +368,7 @@ void testRetracing()
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     t[0x21]       = {reinterpret_cast<void*>(0x21), &t[0x20], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x20].lr[1] = &t[0x21];
-    TEST_ASSERT_NULL(_cavlRetrace(&t[0x21], +1));  // Root not reached, NULL returned.
+    TEST_ASSERT_NULL(_cavlRetrace(&t[0x21], true));  // Root not reached, NULL returned.
     std::puts("ADD 0x21:");
     print(&t[0x30]);
     TEST_ASSERT_EQUAL(0, t[0x20].bf);
@@ -424,7 +435,7 @@ void testRetracing()
     TEST_ASSERT_EQUAL(7, checkAscension(&t[0x30]));
     t[0x15]       = {reinterpret_cast<void*>(0x15), &t[0x10], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x10].lr[1] = &t[0x15];
-    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x15], +1));  // Same root, its balance becomes -1.
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x15], true));  // Same root, its balance becomes -1.
     print(&t[0x30]);
     TEST_ASSERT_EQUAL(+1, t[0x10].bf);
     TEST_ASSERT_EQUAL(-1, t[0x20].bf);
@@ -436,7 +447,7 @@ void testRetracing()
     std::puts("ADD 0x17:");
     t[0x17]       = {reinterpret_cast<void*>(0x17), &t[0x15], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x15].lr[1] = &t[0x17];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x17], +1));  // Same root, same balance, 0x10 rotated left.
+    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x17], true));  // Same root, same balance, 0x10 rotated left.
     print(&t[0x30]);
     // Check 0x10
     TEST_ASSERT_EQUAL(&t[0x15], t[0x10].up);
@@ -471,7 +482,7 @@ void testRetracing()
     std::puts("ADD 0x18:");
     t[0x18]       = {reinterpret_cast<void*>(0x18), &t[0x17], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x17].lr[1] = &t[0x18];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x18], +1));  // Same root, 0x15 went left, 0x20 went right.
+    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x18], true));  // Same root, 0x15 went left, 0x20 went right.
     print(&t[0x30]);
     // Check 0x17
     TEST_ASSERT_EQUAL(&t[0x30], t[0x17].up);

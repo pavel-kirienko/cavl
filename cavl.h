@@ -41,7 +41,7 @@ struct Cavl
     void*  value;  ///< The user data stored in this node.
     Cavl*  up;     ///< Parent node, NULL in the root.
     Cavl*  lr[2];  ///< Left child (lesser), right child (greater).
-    int8_t bf;     ///< Balance factor is positive when right-heavy.
+    int8_t bf;     ///< Balance factor is positive when right-heavy. Allowed values are {-1, 0, +1}.
 };
 
 /// Returns positive if the search target is greater than the node value, negative if smaller, zero on match (found).
@@ -49,6 +49,7 @@ typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
 
 /// If provided, the factory is invoked if the searched node could not be found.
 /// It is expected to return a new node that will be inserted immediately without the need to traverse the tree again.
+/// All fields of the returned node will be initialized by the library except for the user 'value' pointer.
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef Cavl* (*CavlFactory)(void* user_reference);
 
@@ -76,7 +77,7 @@ static inline void cavlRemove(Cavl** const root, Cavl* const node);
 /// INTERNAL USE ONLY. Makes '!r' child of 'x' its parent; i.e., rotates toward 'r'.
 static inline Cavl* _cavlRotate(Cavl* const x, const bool r)
 {
-    assert((x != NULL) && (x->lr[!r] != NULL));
+    assert((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     Cavl* const z = x->lr[!r];
     if (x->up != NULL)
     {
@@ -93,11 +94,15 @@ static inline Cavl* _cavlRotate(Cavl* const x, const bool r)
     return z;
 }
 
-/// INTERNAL USE ONLY. Returns the new node to replace the old one if balancing took place, same node otherwise.
-static inline Cavl* _cavlBalance(Cavl* const x)
+/// INTERNAL USE ONLY.
+/// Accepts a node and how its balance factor needs to be changed -- either +1 or -1.
+/// Returns the new node to replace the old one if tree rotation took place, same node otherwise.
+static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
 {
-    Cavl* out = x;
-    if ((x != NULL) && ((x->bf < -1) || (x->bf > 1)))  // The AVL invariant is bf in {-1, 0, +1}.
+    assert((x != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
+    Cavl*        out    = x;
+    const int8_t new_bf = (int8_t) (x->bf + (increment ? +1 : -1));
+    if ((new_bf < -1) || (new_bf > 1))
     {
         const bool   r    = x->bf < 0;    // bf<0 if left-heavy --> right rotation is needed.
         const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
@@ -142,25 +147,27 @@ static inline Cavl* _cavlBalance(Cavl* const x)
             }
         }
     }
+    else
+    {
+        x->bf = new_bf;  // Balancing not needed, just update the balance factor and call it a day.
+    }
     return out;
 }
 
 /// INTERNAL USE ONLY.
 /// Takes the culprit node (the one that is added/removed); returns NULL or the root of the tree (possibly new one).
 /// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
-static inline Cavl* _cavlRetrace(Cavl* const start, const int8_t growth)
+static inline Cavl* _cavlRetrace(Cavl* const start, const bool grow_not_shrink)
 {
-    assert((start != NULL) && ((growth == -1) || (growth == +1)));
+    assert((start != NULL) && ((start->bf >= -1) && (start->bf <= +1)));
     Cavl* c = start;      // Child
     Cavl* p = start->up;  // Parent
     while (p != NULL)
     {
         const bool r = p->lr[1] == c;  // c is the right child of parent
         assert(p->lr[r] == c);
-        p->bf = (int8_t) (p->bf + (r ? +growth : -growth));
-        p     = _cavlBalance(p);
-        c     = p;
-        p     = c->up;
+        c = _cavlAdjustBalance(p, r == grow_not_shrink);
+        p = c->up;
         if (c->bf == 0)
         {           // The height change of the subtree made this parent perfectly balanced (as all things should be),
             break;  // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
@@ -202,7 +209,7 @@ static inline Cavl* cavlSearch(Cavl** const        root,
                 out->lr[1]     = NULL;
                 out->up        = up;
                 out->bf        = 0;
-                Cavl* const rt = _cavlRetrace(out, +1);
+                Cavl* const rt = _cavlRetrace(out, true);
                 if (rt != NULL)
                 {
                     *root = rt;
