@@ -171,8 +171,9 @@ void testRotation()
     TEST_ASSERT_EQUAL(&c, z.lr[1]);
 }
 
-void testBalancing()
+void testBalancingA()
 {
+    // Double left-right rotation.
     //     X             X           Y
     //    / `           / `        /   `
     //   Z   C   =>    Y   C  =>  Z     X
@@ -182,22 +183,20 @@ void testBalancing()
     //   F   G     D   F
     Cavl x{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, -2};
     Cavl z{reinterpret_cast<void*>(2), &x, {Zz, Zz}, +1};
-    Cavl c{reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
-    Cavl d{reinterpret_cast<void*>(4), &z, {Zz, Zz}, 0};
-    Cavl y{reinterpret_cast<void*>(5), &z, {Zz, Zz}, 0};
-    Cavl f{reinterpret_cast<void*>(6), &y, {Zz, Zz}, 0};
-    Cavl g{reinterpret_cast<void*>(7), &y, {Zz, Zz}, 0};
+    Cavl c{reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
+    Cavl d{reinterpret_cast<void*>(4), &z, {Zz, Zz}, 00};
+    Cavl y{reinterpret_cast<void*>(5), &z, {Zz, Zz}, 00};
+    Cavl f{reinterpret_cast<void*>(6), &y, {Zz, Zz}, 00};
+    Cavl g{reinterpret_cast<void*>(7), &y, {Zz, Zz}, 00};
     x.lr[0] = &z;
     x.lr[1] = &c;
     z.lr[0] = &d;
     z.lr[1] = &y;
     y.lr[0] = &f;
     y.lr[1] = &g;
-    std::puts("Before balancing:");
     print(&x);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    std::puts("After balancing:");
     TEST_ASSERT_EQUAL(&y, _cavlBalance(&x));
     print(&y);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));
@@ -216,7 +215,11 @@ void testBalancing()
     TEST_ASSERT_EQUAL(Zz, g.lr[1]);
     TEST_ASSERT_EQUAL(Zz, c.lr[0]);
     TEST_ASSERT_EQUAL(Zz, c.lr[1]);
-    // Same but WITHOUT F, which makes the handling of Z and Y more complex, Z flips the sign of its balance factor:
+}
+
+void testBalancingB()
+{
+    // Without F the handling of Z and Y is more complex; Z flips the sign of its balance factor:
     //     X             X           Y
     //    / `           / `        /   `
     //   Z   C   =>    Y   C  =>  Z     X
@@ -224,17 +227,21 @@ void testBalancing()
     // D   Y         Z   G      D     G   C
     //      `       /
     //       G     D
-    x = {x.value, Zz, {&z, &c}, -2};
-    z = {z.value, &x, {&d, &y}, +1};
-    c = {c.value, &x, {Zz, Zz}, 00};
-    d = {d.value, &z, {Zz, Zz}, 00};
-    y = {y.value, &z, {Zz, &g}, +1};
-    g = {g.value, &y, {Zz, Zz}, 00};
-    std::puts("Before balancing:");
+    Cavl x{};
+    Cavl z{};
+    Cavl c{};
+    Cavl d{};
+    Cavl y{};
+    Cavl g{};
+    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, -2};
+    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, +1};
+    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
+    d = {reinterpret_cast<void*>(4), &z, {Zz, Zz}, 00};
+    y = {reinterpret_cast<void*>(5), &z, {Zz, &g}, +1};
+    g = {reinterpret_cast<void*>(7), &y, {Zz, Zz}, 00};
     print(&x);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    std::puts("After balancing:");
     TEST_ASSERT_EQUAL(&y, _cavlBalance(&x));
     print(&y);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));
@@ -251,7 +258,11 @@ void testBalancing()
     TEST_ASSERT_EQUAL(Zz, g.lr[1]);
     TEST_ASSERT_EQUAL(Zz, c.lr[0]);
     TEST_ASSERT_EQUAL(Zz, c.lr[1]);
-    // As the first case but both X and Z are heavy on the same side.
+}
+
+void testBalancingC()
+{
+    // Both X and Z are heavy on the same side.
     //       X              Z
     //      / `           /   `
     //     Z   C   =>    D     X
@@ -259,18 +270,23 @@ void testBalancing()
     //   D   Y         F   G Y   C
     //  / `
     // F   G
-    x = {x.value, Zz, {&z, &c}, -2};
-    z = {z.value, &x, {&d, &y}, -1};
-    c = {c.value, &x, {Zz, Zz}, 0};
-    d = {d.value, &z, {&f, &g}, 0};
-    y = {y.value, &z, {Zz, Zz}, 0};
-    f = {f.value, &d, {Zz, Zz}, 0};
-    g = {g.value, &d, {Zz, Zz}, 0};
-    std::puts("Before balancing:");
+    Cavl x{};
+    Cavl z{};
+    Cavl c{};
+    Cavl d{};
+    Cavl y{};
+    Cavl f{};
+    Cavl g{};
+    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, -2};
+    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, -1};
+    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 00};
+    d = {reinterpret_cast<void*>(4), &z, {&f, &g}, 00};
+    y = {reinterpret_cast<void*>(5), &z, {Zz, Zz}, 00};
+    f = {reinterpret_cast<void*>(6), &d, {Zz, Zz}, 00};
+    g = {reinterpret_cast<void*>(7), &d, {Zz, Zz}, 00};
     print(&x);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&x));
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    std::puts("After balancing:");
     TEST_ASSERT_EQUAL(&z, _cavlBalance(&x));
     print(&z);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&z));
@@ -393,7 +409,7 @@ void testRetracing()
     //   /
     // 0x10
     //
-    // After right rotation of 0x20:
+    // After right rotation of 0x20, this is the final state:
     //
     //           0x30
     //         /       `
@@ -457,6 +473,40 @@ void testRetracing()
     t[0x17].lr[1] = &t[0x18];
     TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x18], +1));  // Same root, 0x15 went left, 0x20 went right.
     print(&t[0x30]);
+    // Check 0x17
+    TEST_ASSERT_EQUAL(&t[0x30], t[0x17].up);
+    TEST_ASSERT_EQUAL(0, t[0x17].bf);
+    TEST_ASSERT_EQUAL(&t[0x15], t[0x17].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x17].lr[1]);
+    // Check 0x15
+    TEST_ASSERT_EQUAL(&t[0x17], t[0x15].up);
+    TEST_ASSERT_EQUAL(-1, t[0x15].bf);
+    TEST_ASSERT_EQUAL(&t[0x10], t[0x15].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x15].lr[1]);
+    // Check 0x20
+    TEST_ASSERT_EQUAL(&t[0x17], t[0x20].up);
+    TEST_ASSERT_EQUAL(0, t[0x20].bf);
+    TEST_ASSERT_EQUAL(&t[0x18], t[0x20].lr[0]);
+    TEST_ASSERT_EQUAL(&t[0x21], t[0x20].lr[1]);
+    // Check 0x10
+    TEST_ASSERT_EQUAL(&t[0x15], t[0x10].up);
+    TEST_ASSERT_EQUAL(0, t[0x10].bf);
+    TEST_ASSERT_EQUAL(nullptr, t[0x10].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x10].lr[1]);
+    // Check 0x18
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x18].up);
+    TEST_ASSERT_EQUAL(0, t[0x18].bf);
+    TEST_ASSERT_EQUAL(nullptr, t[0x18].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x18].lr[1]);
+    // Check 0x21
+    TEST_ASSERT_EQUAL(&t[0x20], t[0x21].up);
+    TEST_ASSERT_EQUAL(0, t[0x21].bf);
+    TEST_ASSERT_EQUAL(nullptr, t[0x21].lr[0]);
+    TEST_ASSERT_EQUAL(nullptr, t[0x21].lr[1]);
+    // Check hard invariants.
+    TEST_ASSERT_NULL(findBrokenAncestry(&t[0x30]));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
+    TEST_ASSERT_EQUAL(10, checkAscension(&t[0x30]));
 }
 
 int8_t predicate(void* const value, const Cavl* const node)
@@ -511,7 +561,9 @@ int main()
     UNITY_BEGIN();
     RUN_TEST(testCheckAscension);
     RUN_TEST(testRotation);
-    RUN_TEST(testBalancing);
+    RUN_TEST(testBalancingA);
+    RUN_TEST(testBalancingB);
+    RUN_TEST(testBalancingC);
     RUN_TEST(testRetracing);
     RUN_TEST(testSearch);
     return UNITY_END();
