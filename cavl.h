@@ -73,56 +73,74 @@ static inline void cavlRemove(Cavl** const root, Cavl* const node);
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
-/// INTERNAL USE ONLY.
-static inline Cavl* _cavlRotate(Cavl* const n, const bool r)
+/// INTERNAL USE ONLY. Makes '!r' child of 'x' its parent; i.e., rotates toward 'r'.
+static inline Cavl* _cavlRotate(Cavl* const x, const bool r)
 {
-    assert((n != NULL) && (n->lr[!r] != NULL));
-    Cavl* const x = n->lr[!r];
-    if (n->up != NULL)
+    assert((x != NULL) && (x->lr[!r] != NULL));
+    Cavl* const z = x->lr[!r];
+    if (x->up != NULL)
     {
-        if (n->up->lr[!r] == n)
-        {
-            n->up->lr[!r] = x;
-        }
-        else
-        {
-            assert(n->up->lr[r] == n);
-            n->up->lr[r] = x;
-        }
+        x->up->lr[x->up->lr[1] == x] = z;
     }
-    x->up     = n->up;
-    n->up     = x;
-    n->lr[!r] = x->lr[r];
-    if (n->lr[!r] != NULL)
+    z->up     = x->up;
+    x->up     = z;
+    x->lr[!r] = z->lr[r];
+    if (x->lr[!r] != NULL)
     {
-        n->lr[!r]->up = n;
+        x->lr[!r]->up = x;
     }
-    x->lr[r]           = n;
-    const int8_t delta = r ? +1 : -1;
-    n->bf              = (int8_t) (n->bf + delta);
-    x->bf              = (int8_t) (x->bf + delta);
-    return x;
+    z->lr[r] = x;
+    return z;
 }
 
 /// INTERNAL USE ONLY. Returns the new node to replace the old one if balancing took place, same node otherwise.
-static inline Cavl* _cavlBalance(Cavl* const n)
+static inline Cavl* _cavlBalance(Cavl* const x)
 {
-    Cavl* out = n;
-    if ((n != NULL) && ((n->bf < -1) || (n->bf > 1)))  // The AVL invariant is bf in {-1, 0, +1}.
+    Cavl* out = x;
+    if ((x != NULL) && ((x->bf < -1) || (x->bf > 1)))  // The AVL invariant is bf in {-1, 0, +1}.
     {
-        const bool right = n->bf < 0;                // bf<0 if left-heavy --> right rotation is needed.
-        assert(n->lr[!right] != NULL);               // Heavy side cannot be empty.
-        if ((n->lr[!right]->bf > 0) == (n->bf > 0))  // Parent and child are heavy on the same side.
+        const bool   r    = x->bf < 0;    // bf<0 if left-heavy --> right rotation is needed.
+        const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
+        Cavl* const  z    = x->lr[!r];
+        assert(z != NULL);        // Heavy side cannot be empty.
+        if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
         {
-            out = _cavlRotate(n, right);
+            out = _cavlRotate(x, r);
+            if (z->bf == 0)
+            {
+                x->bf = (int8_t) (-sign);
+                z->bf = (int8_t) (+sign);
+            }
+            else
+            {
+                x->bf = 0;
+                z->bf = 0;
+            }
         }
         else  // Otherwise, the child needs to be rotated in the opposite direction first.
         {
-            (void) _cavlRotate(n->lr[!right], !right);
-            out = _cavlRotate(n, right);
+            Cavl* const y = z->lr[r];
+            assert(y != NULL);  // Heavy side cannot be empty.
+            (void) _cavlRotate(z, !r);
+            out = _cavlRotate(x, r);
+            if ((y->bf * sign) < 0)
+            {
+                x->bf = (int8_t) (+sign);
+                y->bf = 0;
+                z->bf = 0;
+            }
+            else if ((y->bf * sign) > 0)
+            {
+                x->bf = 0;
+                y->bf = 0;
+                z->bf = (int8_t) (-sign);
+            }
+            else
+            {
+                x->bf = 0;
+                z->bf = 0;
+            }
         }
-        n->bf = (int8_t) (n->bf + (right ? +1 : -1));  // One extra adjustment.
-        assert(n->bf == 0);
     }
     return out;
 }
