@@ -318,7 +318,7 @@ void testBalancingC()
     TEST_ASSERT_EQUAL(Zz, c.lr[1]);
 }
 
-void testRetracing()
+void testRetracingOnGrowth()
 {
     Cavl t[256]{};
     //        0x50                 0x30
@@ -337,7 +337,7 @@ void testRetracing()
     print(&t[0x50]);  // The tree is imbalanced because we just added 1 and are about to retrace it.
     TEST_ASSERT_NULL(findBrokenAncestry(&t[0x50]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[0x50]));
-    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x10], true));
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetraceOnGrowth(&t[0x10]));
     std::puts("ADD 0x10:");
     print(&t[0x30]);  // This is the new root.
     TEST_ASSERT_EQUAL(&t[0x20], t[0x30].lr[0]);
@@ -368,7 +368,7 @@ void testRetracing()
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[0x30]));
     t[0x21]       = {reinterpret_cast<void*>(0x21), &t[0x20], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x20].lr[1] = &t[0x21];
-    TEST_ASSERT_NULL(_cavlRetrace(&t[0x21], true));  // Root not reached, NULL returned.
+    TEST_ASSERT_NULL(_cavlRetraceOnGrowth(&t[0x21]));  // Root not reached, NULL returned.
     std::puts("ADD 0x21:");
     print(&t[0x30]);
     TEST_ASSERT_EQUAL(0, t[0x20].bf);
@@ -435,7 +435,7 @@ void testRetracing()
     TEST_ASSERT_EQUAL(7, checkAscension(&t[0x30]));
     t[0x15]       = {reinterpret_cast<void*>(0x15), &t[0x10], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x10].lr[1] = &t[0x15];
-    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetrace(&t[0x15], true));  // Same root, its balance becomes -1.
+    TEST_ASSERT_EQUAL(&t[0x30], _cavlRetraceOnGrowth(&t[0x15]));  // Same root, its balance becomes -1.
     print(&t[0x30]);
     TEST_ASSERT_EQUAL(+1, t[0x10].bf);
     TEST_ASSERT_EQUAL(-1, t[0x20].bf);
@@ -447,7 +447,7 @@ void testRetracing()
     std::puts("ADD 0x17:");
     t[0x17]       = {reinterpret_cast<void*>(0x17), &t[0x15], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x15].lr[1] = &t[0x17];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x17], true));  // Same root, same balance, 0x10 rotated left.
+    TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[0x17]));  // Same root, same balance, 0x10 rotated left.
     print(&t[0x30]);
     // Check 0x10
     TEST_ASSERT_EQUAL(&t[0x15], t[0x10].up);
@@ -482,7 +482,7 @@ void testRetracing()
     std::puts("ADD 0x18:");
     t[0x18]       = {reinterpret_cast<void*>(0x18), &t[0x17], {Zzzzzzzz, Zzzzzzzz}, 0};
     t[0x17].lr[1] = &t[0x18];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetrace(&t[0x18], true));  // Same root, 0x15 went left, 0x20 went right.
+    TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[0x18]));  // Same root, 0x15 went left, 0x20 went right.
     print(&t[0x30]);
     // Check 0x17
     TEST_ASSERT_EQUAL(&t[0x30], t[0x17].up);
@@ -533,7 +533,7 @@ int8_t predicate(void* const value, const Cavl* const node)
     return 0;
 }
 
-void testSearch()
+void testSearchTrivial()
 {
     //      A
     //    B   C
@@ -575,7 +575,7 @@ int main()
     RUN_TEST(testBalancingA);
     RUN_TEST(testBalancingB);
     RUN_TEST(testBalancingC);
-    RUN_TEST(testRetracing);
-    RUN_TEST(testSearch);
+    RUN_TEST(testRetracingOnGrowth);
+    RUN_TEST(testSearchTrivial);
     return UNITY_END();
 }

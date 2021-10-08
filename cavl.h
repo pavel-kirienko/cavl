@@ -58,18 +58,18 @@ typedef Cavl* (*CavlFactory)(void* user_reference);
 /// - If the node is not found and the factory is NULL, return NULL.
 /// - If the node is not found and the factory is not NULL, construct a new node using the factory, insert & return it;
 ///   if the factory returned NULL, behave as if factory was NULL.
-/// The user_reference is passed into the functions unmodified.
+/// The user_reference is passed into the predicate/factory unmodified.
+/// The root node may be replaced in the process.
 /// If predicate is NULL, returns NULL.
 static inline Cavl* cavlSearch(Cavl** const        root,
                                void* const         user_reference,
                                const CavlPredicate predicate,
                                const CavlFactory   factory);
 
-#if 0
-/// Remove the specified node from its tree in constant time. No search is necessary. The children will survive.
-/// No effect if either of the pointers are NULL.
+/// Remove the specified node from its tree. The root node may be replaced in the process. UB if node not in the tree.
+/// The worst-case complexity is O(log n).
+/// The function has no effect if either of the pointers are NULL.
 static inline void cavlRemove(Cavl** const root, Cavl* const node);
-#endif
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
@@ -155,18 +155,18 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
 }
 
 /// INTERNAL USE ONLY.
-/// Takes the culprit node (the one that is added/removed); returns NULL or the root of the tree (possibly new one).
+/// Takes the culprit node (the one that is added); returns NULL or the root of the tree (possibly new one).
 /// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
-static inline Cavl* _cavlRetrace(Cavl* const start, const bool grow_not_shrink)
+static inline Cavl* _cavlRetraceOnGrowth(Cavl* const added)
 {
-    assert((start != NULL) && ((start->bf >= -1) && (start->bf <= +1)));
-    Cavl* c = start;      // Child
-    Cavl* p = start->up;  // Parent
+    assert((added != NULL) && (added->bf == 0));
+    Cavl* c = added;      // Child
+    Cavl* p = added->up;  // Parent
     while (p != NULL)
     {
         const bool r = p->lr[1] == c;  // c is the right child of parent
         assert(p->lr[r] == c);
-        c = _cavlAdjustBalance(p, r == grow_not_shrink);
+        c = _cavlAdjustBalance(p, r);
         p = c->up;
         if (c->bf == 0)
         {           // The height change of the subtree made this parent perfectly balanced (as all things should be),
@@ -209,7 +209,7 @@ static inline Cavl* cavlSearch(Cavl** const        root,
                 out->lr[1]     = NULL;
                 out->up        = up;
                 out->bf        = 0;
-                Cavl* const rt = _cavlRetrace(out, true);
+                Cavl* const rt = _cavlRetraceOnGrowth(out);
                 if (rt != NULL)
                 {
                     *root = rt;
@@ -218,6 +218,14 @@ static inline Cavl* cavlSearch(Cavl** const        root,
         }
     }
     return out;
+}
+
+static inline void cavlRemove(Cavl** const root, Cavl* const node)
+{
+    if ((root != NULL) && (node != NULL))
+    {
+        //
+    }
 }
 
 #ifdef __cplusplus
