@@ -25,8 +25,8 @@ void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker
             std::printf("    ");
         }
         std::printf("%c=%p [%d]\n", marker, nd->value, nd->bf);
-        print(nd->lr[0], depth + 1U, 'L');
-        print(nd->lr[1], depth + 1U, 'R');
+        print(nd->lr[0], static_cast<std::uint8_t>(depth + 1U), 'L');
+        print(nd->lr[1], static_cast<std::uint8_t>(depth + 1U), 'R');
     }
 }
 
