@@ -1,0 +1,87 @@
+name: Main Workflow
+
+on: [push, pull_request]
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: ['clang', 'gcc']
+        include:
+          - toolchain: gcc
+            c-compiler: gcc
+            cxx-compiler: g++
+          - toolchain: clang
+            c-compiler: clang
+            cxx-compiler: clang++
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: sudo apt install gcc-multilib g++-multilib clang-tidy-12
+
+      - name: Configure CMake
+        run: >
+          cmake
+          -B ${{ github.workspace }}/build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=${{ matrix.c-compiler }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx-compiler }}
+          .
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: make VERBOSE=1
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: make test
+
+  optimizations:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: ['clang', 'gcc']
+        build_type: [Release, MinSizeRel]
+        include:
+          - toolchain: gcc
+            c-compiler: gcc
+            cxx-compiler: g++
+          - toolchain: clang
+            c-compiler: clang
+            cxx-compiler: clang++
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: sudo apt install gcc-multilib g++-multilib
+
+      - name: Configure CMake
+        run: >
+          cmake
+          -B ${{ github.workspace }}/build
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_C_COMPILER=${{ matrix.c-compiler }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx-compiler }}
+          -DNO_STATIC_ANALYSIS=1
+          .
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: make VERBOSE=1
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: make test
+
+  style_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: DoozyX/clang-format-lint-action@v0.12
+        with:
+          source: '.'
+          exclude: './test/unity'
+          extensions: 'c,h,cpp,hpp'
+          clangFormatVersion: 12
