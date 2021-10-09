@@ -1,6 +1,6 @@
 /// Copyright (c) 2021 Pavel Kirienko <pavel@uavcan.org>
 
-#include "../cavl.h"
+#include "cavl.h"
 #include <unity.h>
 #include <algorithm>
 #include <cstdio>

@@ -82,6 +82,6 @@ jobs:
       - uses: DoozyX/clang-format-lint-action@v0.12
         with:
           source: '.'
-          exclude: './test/unity'
+          exclude: './unity'
           extensions: 'c,h,cpp,hpp'
           clangFormatVersion: 12
