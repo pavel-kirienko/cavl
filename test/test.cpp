@@ -563,6 +563,14 @@ void testSearchTrivial()
     TEST_ASSERT_EQUAL(&e, cavlSearch(&root, e.value, predicate, nullptr));  // Item found.
     TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
     print(&a);
+    TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, true));
+    TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, false));
+    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&a, true));
+    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&a, false));
+    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&g, true));
+    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&g, false));
+    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&d, true));
+    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&d, false));
 }
 
 }  // namespace

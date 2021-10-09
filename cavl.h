@@ -71,6 +71,20 @@ static inline Cavl* cavlSearch(Cavl** const        root,
 /// The function has no effect if either of the pointers are NULL.
 static inline void cavlRemove(Cavl** const root, Cavl* const node);
 
+/// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
+/// Returns NULL iff the argument is NULL (i.e., the tree is empty). The worst-case complexity is O(log n).
+static inline Cavl* cavlFindExtremum(Cavl* const root, const bool max_not_min)
+{
+    Cavl* result = NULL;
+    Cavl* c      = root;
+    while (c != NULL)
+    {
+        result = c;
+        c      = c->lr[max_not_min];
+    }
+    return result;
+}
+
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
