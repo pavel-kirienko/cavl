@@ -665,6 +665,54 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(&t[7], t[8].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[8].lr[1]);
     TEST_ASSERT_EQUAL(-1, t[8].bf);
+    // Remove 8, 7 takes its place (the one-child case). The rest of the tree remains unchanged.
+    //        4
+    //      /   `
+    //    2       6
+    //   / `     / `
+    //  1   3   5   7
+    std::puts("REMOVE 8:");
+    cavlRemove(&root, &t[8]);
+    TEST_ASSERT_EQUAL(&t[4], root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(7, checkAscension(root));
+    print(root);
+    // 1
+    TEST_ASSERT_EQUAL(&t[2], t[1].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[1].bf);
+    // 2
+    TEST_ASSERT_EQUAL(&t[4], t[2].up);
+    TEST_ASSERT_EQUAL(&t[1], t[2].lr[0]);
+    TEST_ASSERT_EQUAL(&t[3], t[2].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(&t[2], t[3].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 4
+    TEST_ASSERT_EQUAL(Zzzzz, t[4].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[4].lr[0]);
+    TEST_ASSERT_EQUAL(&t[6], t[4].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[4].bf);
+    // 5
+    TEST_ASSERT_EQUAL(&t[6], t[5].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[5].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[5].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[5].bf);
+    // 6
+    TEST_ASSERT_EQUAL(&t[4], t[6].up);
+    TEST_ASSERT_EQUAL(&t[5], t[6].lr[0]);
+    TEST_ASSERT_EQUAL(&t[7], t[6].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[6].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[6], t[7].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[7].bf);
 }
 
 }  // namespace
