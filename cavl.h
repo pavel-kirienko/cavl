@@ -272,6 +272,8 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             {
                 *root = re;
             }
+            re->lr[0]->up = re;
+            re->lr[1]->up = re;
         }
         else  // Either or both of the children are NULL.
         {

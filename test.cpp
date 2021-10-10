@@ -621,10 +621,10 @@ void testRemovalA()
     std::puts("REMOVE 9:");
     cavlRemove(&root, &t[9]);
     TEST_ASSERT_EQUAL(&t[4], root);
+    print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
     TEST_ASSERT_NULL(findBrokenAncestry(root));
     TEST_ASSERT_EQUAL(8, checkAscension(root));
-    print(root);
     // 1
     TEST_ASSERT_EQUAL(&t[2], t[1].up);
     TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
@@ -674,10 +674,10 @@ void testRemovalA()
     std::puts("REMOVE 8:");
     cavlRemove(&root, &t[8]);
     TEST_ASSERT_EQUAL(&t[4], root);
+    print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
     TEST_ASSERT_NULL(findBrokenAncestry(root));
     TEST_ASSERT_EQUAL(7, checkAscension(root));
-    print(root);
     // 1
     TEST_ASSERT_EQUAL(&t[2], t[1].up);
     TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
@@ -708,6 +708,49 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(&t[5], t[6].lr[0]);
     TEST_ASSERT_EQUAL(&t[7], t[6].lr[1]);
     TEST_ASSERT_EQUAL(00, t[6].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[6], t[7].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[7].bf);
+    // Remove the root node 4, 5 takes its place. The overall structure remains unchanged except that 5 is now the root.
+    //        5
+    //      /   `
+    //    2       6
+    //   / `       `
+    //  1   3       7
+    std::puts("REMOVE 4:");
+    cavlRemove(&root, &t[4]);
+    TEST_ASSERT_EQUAL(&t[5], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(6, checkAscension(root));
+    // 1
+    TEST_ASSERT_EQUAL(&t[2], t[1].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[1].bf);
+    // 2
+    TEST_ASSERT_EQUAL(&t[5], t[2].up);
+    TEST_ASSERT_EQUAL(&t[1], t[2].lr[0]);
+    TEST_ASSERT_EQUAL(&t[3], t[2].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(&t[2], t[3].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 5
+    TEST_ASSERT_EQUAL(Zzzzz, t[5].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[5].lr[0]);
+    TEST_ASSERT_EQUAL(&t[6], t[5].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[5].bf);
+    // 6
+    TEST_ASSERT_EQUAL(&t[5], t[6].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[6].lr[0]);
+    TEST_ASSERT_EQUAL(&t[7], t[6].lr[1]);
+    TEST_ASSERT_EQUAL(+1, t[6].bf);
     // 7
     TEST_ASSERT_EQUAL(&t[6], t[7].up);
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
