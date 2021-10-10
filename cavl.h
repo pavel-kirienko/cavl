@@ -295,21 +295,24 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
         // balance factors until we reach the root or a parent whose balance factor becomes plus/minus one, which
         // means that that parent was able to absorb the balance delta; in other words, the height of the outer
         // subtree is unchanged, so upper balance factors shall be kept unchanged.
-        Cavl* c = NULL;
-        while (p != NULL)
+        if (p != NULL)
         {
-            c = _cavlAdjustBalance(p, !r);
-            p = c->up;
-            if ((c->bf != 0) || (p == NULL))
+            Cavl* c = NULL;
+            for (;;)
             {
-                break;
+                c = _cavlAdjustBalance(p, !r);
+                p = c->up;
+                if ((c->bf != 0) || (p == NULL))  // Reached the root or the height difference is absorbed by c.
+                {
+                    break;
+                }
+                r = p->lr[1] == c;
             }
-            r = p->lr[1] == c;
-        }
-        // The entire tree may have obtained a new root, which is reflected by updating the root pointer.
-        if ((p == NULL) && (c != NULL))
-        {
-            *root = c;
+            if (p == NULL)
+            {
+                assert(c != NULL);
+                *root = c;
+            }
         }
     }
 }
