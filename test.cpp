@@ -14,7 +14,7 @@ void tearDown() {}
 namespace
 {
 constexpr auto Zz       = nullptr;
-constexpr auto Zzzzzzzz = Zz;
+constexpr auto Zzzzzzzz = nullptr;
 
 void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {

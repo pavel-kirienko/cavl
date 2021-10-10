@@ -28,6 +28,9 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
+// This is, strictly speaking, useless because we do not define any functions with external linkage here,
+// but it tells static analyzers that what follows should be interpreted as C code rather than C++, where
+// identifiers starting with "_" are allowed in the global scope, C-style casts are allowed, etc.
 extern "C" {
 #endif
 
@@ -69,18 +72,18 @@ static inline Cavl* cavlSearch(Cavl** const        root,
 /// Remove the specified node from its tree. The root node may be replaced in the process. UB if node not in the tree.
 /// The worst-case complexity is O(log n).
 /// The function has no effect if either of the pointers are NULL.
-static inline void cavlRemove(Cavl** const root, Cavl* const node);
+static inline void cavlRemove(Cavl** const root, const Cavl* const node);
 
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
 /// Returns NULL iff the argument is NULL (i.e., the tree is empty). The worst-case complexity is O(log n).
-static inline Cavl* cavlFindExtremum(Cavl* const root, const bool max_not_min)
+static inline Cavl* cavlFindExtremum(Cavl* const root, const bool maximum)
 {
     Cavl* result = NULL;
     Cavl* c      = root;
     while (c != NULL)
     {
         result = c;
-        c      = c->lr[max_not_min];
+        c      = c->lr[maximum];
     }
     return result;
 }
@@ -118,7 +121,7 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
     const int8_t new_bf = (int8_t) (x->bf + (increment ? +1 : -1));
     if ((new_bf < -1) || (new_bf > 1))
     {
-        const bool   r    = x->bf < 0;    // bf<0 if left-heavy --> right rotation is needed.
+        const bool   r    = new_bf < 0;   // bf<0 if left-heavy --> right rotation is needed.
         const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
         Cavl* const  z    = x->lr[!r];
         assert(z != NULL);        // Heavy side cannot be empty.
@@ -234,11 +237,80 @@ static inline Cavl* cavlSearch(Cavl** const        root,
     return out;
 }
 
-static inline void cavlRemove(Cavl** const root, Cavl* const node)
+static inline void cavlRemove(Cavl** const root, const Cavl* const node)
 {
     if ((root != NULL) && (node != NULL))
     {
-        //
+        assert(*root != NULL);  // Otherwise, the node would have to be NULL.
+        assert((node->up != NULL) || (node == *root));
+        Cavl* p = NULL;   // The lowest parent node that suffered a shortening of its subtree.
+        bool  r = false;  // Which side of the above was shortened.
+        // The first step is to update the topology and remember the node where to start the retracing from later.
+        // Balancing is not performed yet so we may end up with an unbalanced tree.
+        if ((node->lr[0] != NULL) && (node->lr[1] != NULL))
+        {
+            Cavl* const re = cavlFindExtremum(node->lr[1], false);
+            assert((re != NULL) && (re->lr[0] == NULL) && (re->up != NULL) && (re->up->lr[0] == re));
+            p         = re->up;
+            re->lr[0] = node->lr[0];
+            if (p != node)
+            {
+                p->lr[0]  = re->lr[1];  // Reducing the height of the left subtree here.
+                re->lr[1] = node->lr[1];
+                r         = false;
+            }
+            else  // In this case, we are reducing the height of the right subtree, so r=1.
+            {
+                r = true;
+            }
+            re->up = node->up;
+            if (re->up != NULL)
+            {
+                re->up->lr[re->up->lr[1] == node] = re;  // Replace link in the parent of node.
+            }
+            else
+            {
+                *root = re;
+            }
+        }
+        else  // Either or both of the children are NULL.
+        {
+            p             = node->up;
+            const bool rr = node->lr[1] != NULL;
+            if (node->lr[rr] != NULL)
+            {
+                node->lr[rr]->up = p;
+            }
+            if (p != NULL)
+            {
+                r        = p->lr[1] == node;
+                p->lr[r] = node->lr[rr];
+            }
+            else
+            {
+                *root = node->lr[rr];
+            }
+        }
+        // Now that the topology is updated, perform the retracing to restore balance. We climb up adjusting the
+        // balance factors until we reach the root or a parent whose balance factor becomes plus/minus one, which
+        // means that that parent was able to absorb the balance delta; in other words, the height of the outer
+        // subtree is unchanged, so upper balance factors shall be kept unchanged.
+        Cavl* c = NULL;
+        while (p != NULL)
+        {
+            c = _cavlAdjustBalance(p, !r);
+            p = c->up;
+            if (c->bf != 0)
+            {
+                break;
+            }
+            r = p->lr[1] == c;
+        }
+        // The entire tree may have obtained a new root, which is reflected by updating the root pointer.
+        if ((p == NULL) && (c != NULL))
+        {
+            *root = c;
+        }
     }
 }
 
