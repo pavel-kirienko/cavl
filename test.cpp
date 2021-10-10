@@ -610,6 +610,7 @@ void testRemovalA()
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
     TEST_ASSERT_NULL(findBrokenAncestry(root));
     TEST_ASSERT_EQUAL(9, checkAscension(root));
+
     // Remove 9, the easiest case. The rest of the tree remains unchanged.
     //        4
     //      /   `
@@ -665,6 +666,7 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(&t[7], t[8].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[8].lr[1]);
     TEST_ASSERT_EQUAL(-1, t[8].bf);
+
     // Remove 8, 7 takes its place (the one-child case). The rest of the tree remains unchanged.
     //        4
     //      /   `
@@ -713,6 +715,7 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
     TEST_ASSERT_EQUAL(00, t[7].bf);
+
     // Remove the root node 4, 5 takes its place. The overall structure remains unchanged except that 5 is now the root.
     //        5
     //      /   `
@@ -756,6 +759,7 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
     TEST_ASSERT_EQUAL(00, t[7].bf);
+
     // Remove the root node 5, 6 takes its place.
     //        6
     //      /   `
@@ -794,6 +798,108 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
     TEST_ASSERT_EQUAL(00, t[7].bf);
+
+    // Remove the root node 6, 7 takes its place, then right rotation is done to restore balance, 2 is the new root.
+    //          2
+    //        /   `
+    //       1     7
+    //            /
+    //           3
+    std::puts("REMOVE 6:");
+    cavlRemove(&root, &t[6]);
+    TEST_ASSERT_EQUAL(&t[2], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(4, checkAscension(root));
+    // 1
+    TEST_ASSERT_EQUAL(&t[2], t[1].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[1].bf);
+    // 2
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[1], t[2].lr[0]);
+    TEST_ASSERT_EQUAL(&t[7], t[2].lr[1]);
+    TEST_ASSERT_EQUAL(+1, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(&t[7], t[3].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[2], t[7].up);
+    TEST_ASSERT_EQUAL(&t[3], t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(-1, t[7].bf);
+
+    // Remove 1, then balancing makes 3 the new root node.
+    //          3
+    //        /   `
+    //       2     7
+    std::puts("REMOVE 1:");
+    cavlRemove(&root, &t[1]);
+    TEST_ASSERT_EQUAL(&t[3], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(3, checkAscension(root));
+    // 2
+    TEST_ASSERT_EQUAL(&t[3], t[2].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[1]);
+    TEST_ASSERT_EQUAL(0, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[3].lr[0]);
+    TEST_ASSERT_EQUAL(&t[7], t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[3], t[7].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[7].bf);
+
+    // Remove 7.
+    //          3
+    //        /
+    //       2
+    std::puts("REMOVE 7:");
+    cavlRemove(&root, &t[7]);
+    TEST_ASSERT_EQUAL(&t[3], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(2, checkAscension(root));
+    // 2
+    TEST_ASSERT_EQUAL(&t[3], t[2].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[1]);
+    TEST_ASSERT_EQUAL(0, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(-1, t[3].bf);
+
+    // Remove 3. Only 2 is left, which is now obviously the root.
+    std::puts("REMOVE 3:");
+    cavlRemove(&root, &t[3]);
+    TEST_ASSERT_EQUAL(&t[2], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(1, checkAscension(root));
+    // 2
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[2].lr[1]);
+    TEST_ASSERT_EQUAL(0, t[2].bf);
+
+    // Remove 2. The tree is now empty, make sure the root pointer is updated accordingly.
+    std::puts("REMOVE 2:");
+    cavlRemove(&root, &t[2]);
+    TEST_ASSERT_EQUAL(nullptr, root);
 }
 
 }  // namespace
