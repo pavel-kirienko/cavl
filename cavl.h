@@ -251,19 +251,22 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
         {
             Cavl* const re = cavlFindExtremum(node->lr[1], false);
             assert((re != NULL) && (re->lr[0] == NULL) && (re->up != NULL));
-            p         = re->up;
-            re->lr[0] = node->lr[0];
-            if (p != node)
+            re->bf        = node->bf;
+            re->lr[0]     = node->lr[0];
+            re->lr[0]->up = re;
+            if (re->up != node)
             {
+                p = re->up;  // Retracing starts with the ex-parent of our replacement node.
                 assert(p->lr[0] == re);
-                p->lr[0]  = re->lr[1];  // Reducing the height of the left subtree here.
-                re->lr[1] = node->lr[1];
-                r         = false;
+                p->lr[0]      = re->lr[1];  // Reducing the height of the left subtree here.
+                re->lr[1]     = node->lr[1];
+                re->lr[1]->up = re;
+                r             = false;
             }
             else  // In this case, we are reducing the height of the right subtree, so r=1.
             {
-                assert(p->lr[1] == re);
-                r = true;
+                p = re;    // Retracing starts with the replacement node itself as we are deleting its parent.
+                r = true;  // The right child of the replacement node remains the same so we don't bother relinking it.
             }
             re->up = node->up;
             if (re->up != NULL)
@@ -274,8 +277,6 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             {
                 *root = re;
             }
-            re->lr[0]->up = re;
-            re->lr[1]->up = re;
         }
         else  // Either or both of the children are NULL.
         {
