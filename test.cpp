@@ -14,18 +14,31 @@ void tearDown() {}
 namespace
 {
 constexpr auto Zz       = nullptr;
+constexpr auto Zzzzz    = nullptr;
 constexpr auto Zzzzzzzz = nullptr;
 
 void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {
     if (nd != nullptr)
     {
-        for (std::uint16_t i = 0U; i < depth; i++)
+        print(nd->lr[0], static_cast<std::uint8_t>(depth + 1U), 'L');
+        for (std::uint16_t i = 1U; i < depth; i++)
         {
-            std::printf("    ");
+            std::printf("                ");
+        }
+        if (marker == 'L')
+        {
+            std::printf(" ...............");
+        }
+        else if (marker == 'R')
+        {
+            std::printf(" ```````````````");
+        }
+        else
+        {
+            //
         }
         std::printf("%c=%p [%d]\n", marker, nd->value, nd->bf);
-        print(nd->lr[0], static_cast<std::uint8_t>(depth + 1U), 'L');
         print(nd->lr[1], static_cast<std::uint8_t>(depth + 1U), 'R');
     }
 }
@@ -573,6 +586,87 @@ void testSearchTrivial()
     TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&d, false));
 }
 
+void testRemovalA()
+{
+    //        4
+    //      /   `
+    //    2       6
+    //   / `     / `
+    //  1   3   5   8
+    //             / `
+    //            7   9
+    Cavl t[10]{};
+    t[1]       = {reinterpret_cast<void*>(1), &t[2], {Zzzzz, Zzzzz}, 00};
+    t[2]       = {reinterpret_cast<void*>(2), &t[4], {&t[1], &t[3]}, 00};
+    t[3]       = {reinterpret_cast<void*>(3), &t[2], {Zzzzz, Zzzzz}, 00};
+    t[4]       = {reinterpret_cast<void*>(4), Zzzzz, {&t[2], &t[6]}, +1};
+    t[5]       = {reinterpret_cast<void*>(5), &t[6], {Zzzzz, Zzzzz}, 00};
+    t[6]       = {reinterpret_cast<void*>(6), &t[4], {&t[5], &t[8]}, +1};
+    t[7]       = {reinterpret_cast<void*>(7), &t[8], {Zzzzz, Zzzzz}, 00};
+    t[8]       = {reinterpret_cast<void*>(8), &t[6], {&t[7], &t[9]}, 00};
+    t[9]       = {reinterpret_cast<void*>(9), &t[8], {Zzzzz, Zzzzz}, 00};
+    Cavl* root = &t[4];
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(9, checkAscension(root));
+    // Remove 9, the easiest case. The rest of the tree remains unchanged.
+    //        4
+    //      /   `
+    //    2       6
+    //   / `     / `
+    //  1   3   5   8
+    //             /
+    //            7
+    std::puts("REMOVE 9:");
+    cavlRemove(&root, &t[9]);
+    TEST_ASSERT_EQUAL(&t[4], root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(8, checkAscension(root));
+    print(root);
+    // 1
+    TEST_ASSERT_EQUAL(&t[2], t[1].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[1].bf);
+    // 2
+    TEST_ASSERT_EQUAL(&t[4], t[2].up);
+    TEST_ASSERT_EQUAL(&t[1], t[2].lr[0]);
+    TEST_ASSERT_EQUAL(&t[3], t[2].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(&t[2], t[3].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 4
+    TEST_ASSERT_EQUAL(Zzzzz, t[4].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[4].lr[0]);
+    TEST_ASSERT_EQUAL(&t[6], t[4].lr[1]);
+    TEST_ASSERT_EQUAL(+1, t[4].bf);
+    // 5
+    TEST_ASSERT_EQUAL(&t[6], t[5].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[5].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[5].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[5].bf);
+    // 6
+    TEST_ASSERT_EQUAL(&t[4], t[6].up);
+    TEST_ASSERT_EQUAL(&t[5], t[6].lr[0]);
+    TEST_ASSERT_EQUAL(&t[8], t[6].lr[1]);
+    TEST_ASSERT_EQUAL(+1, t[6].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[8], t[7].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[7].bf);
+    // 8
+    TEST_ASSERT_EQUAL(&t[6], t[8].up);
+    TEST_ASSERT_EQUAL(&t[7], t[8].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[8].lr[1]);
+    TEST_ASSERT_EQUAL(-1, t[8].bf);
+}
+
 }  // namespace
 
 int main()
@@ -585,5 +679,6 @@ int main()
     RUN_TEST(testBalancingC);
     RUN_TEST(testRetracingOnGrowth);
     RUN_TEST(testSearchTrivial);
+    RUN_TEST(testRemovalA);
     return UNITY_END();
 }

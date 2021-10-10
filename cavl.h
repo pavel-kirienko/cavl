@@ -300,7 +300,7 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
         {
             c = _cavlAdjustBalance(p, !r);
             p = c->up;
-            if (c->bf != 0)
+            if (c->bf != 0)  // This means that it *was* balanced prior to the update.
             {
                 break;
             }
