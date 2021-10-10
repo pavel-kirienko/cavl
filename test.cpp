@@ -756,6 +756,44 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
     TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
     TEST_ASSERT_EQUAL(00, t[7].bf);
+    // Remove the root node 5, 6 takes its place.
+    //        6
+    //      /   `
+    //    2       7
+    //   / `
+    //  1   3
+    std::puts("REMOVE 5:");
+    cavlRemove(&root, &t[5]);
+    TEST_ASSERT_EQUAL(&t[6], root);
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(5, checkAscension(root));
+    // 1
+    TEST_ASSERT_EQUAL(&t[2], t[1].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[1].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[1].bf);
+    // 2
+    TEST_ASSERT_EQUAL(&t[6], t[2].up);
+    TEST_ASSERT_EQUAL(&t[1], t[2].lr[0]);
+    TEST_ASSERT_EQUAL(&t[3], t[2].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[2].bf);
+    // 3
+    TEST_ASSERT_EQUAL(&t[2], t[3].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[3].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[3].bf);
+    // 6
+    TEST_ASSERT_EQUAL(Zzzzz, t[6].up);  // Nihil Supernum
+    TEST_ASSERT_EQUAL(&t[2], t[6].lr[0]);
+    TEST_ASSERT_EQUAL(&t[7], t[6].lr[1]);
+    TEST_ASSERT_EQUAL(-1, t[6].bf);
+    // 7
+    TEST_ASSERT_EQUAL(&t[6], t[7].up);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[0]);
+    TEST_ASSERT_EQUAL(Zzzzz, t[7].lr[1]);
+    TEST_ASSERT_EQUAL(00, t[7].bf);
 }
 
 }  // namespace

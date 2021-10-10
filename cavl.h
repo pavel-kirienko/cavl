@@ -250,17 +250,19 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
         if ((node->lr[0] != NULL) && (node->lr[1] != NULL))
         {
             Cavl* const re = cavlFindExtremum(node->lr[1], false);
-            assert((re != NULL) && (re->lr[0] == NULL) && (re->up != NULL) && (re->up->lr[0] == re));
+            assert((re != NULL) && (re->lr[0] == NULL) && (re->up != NULL));
             p         = re->up;
             re->lr[0] = node->lr[0];
             if (p != node)
             {
+                assert(p->lr[0] == re);
                 p->lr[0]  = re->lr[1];  // Reducing the height of the left subtree here.
                 re->lr[1] = node->lr[1];
                 r         = false;
             }
             else  // In this case, we are reducing the height of the right subtree, so r=1.
             {
+                assert(p->lr[1] == re);
                 r = true;
             }
             re->up = node->up;
