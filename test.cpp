@@ -3,6 +3,7 @@
 #include "cavl.h"
 #include <unity.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdint>
 #include <optional>
@@ -26,6 +27,19 @@ struct Node final : Cavl
     Node() : Cavl{Cavl{}} {}
 
     T value{};
+
+    bool checkLinkageUpLeftRightBF(const Cavl* const check_up,
+                                   const Cavl* const check_le,
+                                   const Cavl* const check_ri,
+                                   const std::int8_t check_bf) const
+    {
+        return (up == check_up) &&                                                                   //
+               (lr[0] == check_le) && (lr[1] == check_ri) &&                                         //
+               (bf == check_bf) &&                                                                   //
+               ((check_up == nullptr) || (check_up->lr[0] == this) || (check_up->lr[1] == this)) &&  //
+               ((check_le == nullptr) || (check_le->up == this)) &&                                  //
+               ((check_ri == nullptr) || (check_ri->up == this));
+    }
 
     Node* min() { return reinterpret_cast<Node*>(cavlFindExtremum(this, false)); }
     Node* max() { return reinterpret_cast<Node*>(cavlFindExtremum(this, true)); }
@@ -79,8 +93,17 @@ void remove(Node<T>** const root, const Node<T>* const n)
 }
 
 template <typename T>
+std::uint8_t getHeight(const Node<T>* const n)
+{
+    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(reinterpret_cast<Node<T>*>(n->lr[0])),
+                                                       getHeight(reinterpret_cast<Node<T>*>(n->lr[1]))))
+                          : 0;
+}
+
+template <typename T>
 void print(const Node<T>* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {
+    TEST_ASSERT_LESS_THAN(10, getHeight(nd));  // Fail early for malformed cyclic trees, do not overwhelm stdout.
     if (nd != nullptr)
     {
         print<T>(reinterpret_cast<const Node<T>*>(nd->lr[0]), static_cast<std::uint8_t>(depth + 1U), 'L');
@@ -148,14 +171,6 @@ const Node<T>* findBrokenAncestry(const Node<T>* const n, const Cavl* const pare
         return nullptr;
     }
     return n;
-}
-
-template <typename T>
-std::uint8_t getHeight(const Node<T>* const n)
-{
-    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(reinterpret_cast<Node<T>*>(n->lr[0])),
-                                                       getHeight(reinterpret_cast<Node<T>*>(n->lr[1]))))
-                          : 0;
 }
 
 template <typename T>
@@ -1027,7 +1042,16 @@ void testMutationManual()
     //   2       6      10      14      18      22      26      30
     //  / `     / `     / `     / `     / `     / `       `     / `
     // 1   3   5   7   9  11  13  15  17  19  21  23      27  29  31
-    // TODO
+    std::puts("REMOVE 24:");
+    TEST_ASSERT(t[24].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[28], 00));
+    remove(&root, &t[24]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[25].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[28], 00));
+    TEST_ASSERT(t[26].checkLinkageUpLeftRightBF(&t[28], Zzzzzz, &t[27], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(30, checkAscension(root));
 
     // REMOVE 25
     //                               16
@@ -1039,7 +1063,16 @@ void testMutationManual()
     //   2       6      10      14      18      22      27      30
     //  / `     / `     / `     / `     / `     / `             / `
     // 1   3   5   7   9  11  13  15  17  19  21  23          29  31
-    // TODO
+    std::puts("REMOVE 25:");
+    TEST_ASSERT(t[25].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[28], 00));
+    remove(&root, &t[25]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[26].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[28], 00));
+    TEST_ASSERT(t[28].checkLinkageUpLeftRightBF(&t[26], &t[27], &t[30], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(29, checkAscension(root));
 
     // REMOVE 26
     //                               16
@@ -1051,7 +1084,17 @@ void testMutationManual()
     //   2       6      10      14      18      22      28      31
     //  / `     / `     / `     / `     / `     / `       `
     // 1   3   5   7   9  11  13  15  17  19  21  23      29
-    // TODO
+    std::puts("REMOVE 26:");
+    TEST_ASSERT(t[26].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[28], 00));
+    remove(&root, &t[26]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[27].checkLinkageUpLeftRightBF(&t[16], &t[20], &t[30], 00));
+    TEST_ASSERT(t[30].checkLinkageUpLeftRightBF(&t[27], &t[28], &t[31], -1));
+    TEST_ASSERT(t[28].checkLinkageUpLeftRightBF(&t[30], Zzzzzz, &t[29], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(28, checkAscension(root));
 
     // REMOVE 20
     //                               16
@@ -1063,7 +1106,155 @@ void testMutationManual()
     //   2       6      10      14      18      22      28      31
     //  / `     / `     / `     / `     / `       `       `
     // 1   3   5   7   9  11  13  15  17  19      23      29
-    // TODO
+    std::puts("REMOVE 20:");
+    TEST_ASSERT(t[20].checkLinkageUpLeftRightBF(&t[27], &t[18], &t[22], 00));
+    remove(&root, &t[20]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[21].checkLinkageUpLeftRightBF(&t[27], &t[18], &t[22], 00));
+    TEST_ASSERT(t[22].checkLinkageUpLeftRightBF(&t[21], Zzzzzz, &t[23], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(27, checkAscension(root));
+
+    // REMOVE 27
+    //                               16
+    //                       /               `
+    //               8                              28
+    //           /        `                      /       `
+    //       4              12              21              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      29      31
+    //  / `     / `     / `     / `     / `       `
+    // 1   3   5   7   9  11  13  15  17  19      23
+    std::puts("REMOVE 27:");
+    TEST_ASSERT(t[27].checkLinkageUpLeftRightBF(&t[16], &t[21], &t[30], 00));
+    remove(&root, &t[27]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[28].checkLinkageUpLeftRightBF(&t[16], &t[21], &t[30], -1));
+    TEST_ASSERT(t[30].checkLinkageUpLeftRightBF(&t[28], &t[29], &t[31], 00));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(26, checkAscension(root));
+
+    // REMOVE 28
+    //                               16
+    //                       /               `
+    //               8                              29
+    //           /        `                      /       `
+    //       4              12              21              30
+    //     /    `         /    `          /    `               `
+    //   2       6      10      14      18      22              31
+    //  / `     / `     / `     / `     / `       `
+    // 1   3   5   7   9  11  13  15  17  19      23
+    std::puts("REMOVE 28:");
+    TEST_ASSERT(t[28].checkLinkageUpLeftRightBF(&t[16], &t[21], &t[30], -1));
+    remove(&root, &t[28]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[29].checkLinkageUpLeftRightBF(&t[16], &t[21], &t[30], -1));
+    TEST_ASSERT(t[30].checkLinkageUpLeftRightBF(&t[29], Zzzzzz, &t[31], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(25, checkAscension(root));
+
+    // REMOVE 29; UNBALANCED TREE BEFORE ROTATION:
+    //                               16
+    //                       /               `
+    //               8                              30
+    //           /        `                      /       `
+    //       4              12              21              31
+    //     /    `         /    `          /    `
+    //   2       6      10      14      18      22
+    //  / `     / `     / `     / `     / `       `
+    // 1   3   5   7   9  11  13  15  17  19      23
+    //
+    // FINAL STATE AFTER ROTATION:
+    //                               16
+    //                       /               `
+    //               8                              21
+    //           /        `                      /       `
+    //       4              12              18              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      17      19      22      31
+    //  / `     / `     / `     / `                       `
+    // 1   3   5   7   9  11  13  15                      23
+    std::puts("REMOVE 29:");
+    TEST_ASSERT(t[29].checkLinkageUpLeftRightBF(&t[16], &t[21], &t[30], -1));
+    remove(&root, &t[29]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[21].checkLinkageUpLeftRightBF(&t[16], &t[18], &t[30], +1));
+    TEST_ASSERT(t[18].checkLinkageUpLeftRightBF(&t[21], &t[17], &t[19], 00));
+    TEST_ASSERT(t[30].checkLinkageUpLeftRightBF(&t[21], &t[22], &t[31], -1));
+    TEST_ASSERT(t[22].checkLinkageUpLeftRightBF(&t[30], Zzzzzz, &t[23], +1));
+    TEST_ASSERT(t[16].checkLinkageUpLeftRightBF(Zzzzzz, &t[8], &t[21], 00));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(24, checkAscension(root));
+
+    // REMOVE 8
+    //                               16
+    //                       /               `
+    //               9                              21
+    //           /        `                      /       `
+    //       4              12              18              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      17      19      22      31
+    //  / `     / `       `     / `                       `
+    // 1   3   5   7      11  13  15                      23
+    std::puts("REMOVE 8:");
+    TEST_ASSERT(t[8].checkLinkageUpLeftRightBF(&t[16], &t[4], &t[12], 00));
+    remove(&root, &t[8]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[9].checkLinkageUpLeftRightBF(&t[16], &t[4], &t[12], 00));
+    TEST_ASSERT(t[10].checkLinkageUpLeftRightBF(&t[12], Zzzzz, &t[11], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(23, checkAscension(root));
+
+    // REMOVE 9
+    //                               16
+    //                       /               `
+    //               10                             21
+    //           /        `                      /       `
+    //       4              12              18              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      11      14      17      19      22      31
+    //  / `     / `             / `                       `
+    // 1   3   5   7          13  15                      23
+    std::puts("REMOVE 9:");
+    TEST_ASSERT(t[9].checkLinkageUpLeftRightBF(&t[16], &t[4], &t[12], 00));
+    remove(&root, &t[9]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[10].checkLinkageUpLeftRightBF(&t[16], &t[4], &t[12], 00));
+    TEST_ASSERT(t[12].checkLinkageUpLeftRightBF(&t[10], &t[11], &t[14], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(22, checkAscension(root));
+
+    // REMOVE 1
+    //                               16
+    //                       /               `
+    //               10                             21
+    //           /        `                      /       `
+    //       4              12              18              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      11      14      17      19      22      31
+    //    `     / `             / `                       `
+    //     3   5   7          13  15                      23
+    std::puts("REMOVE 1:");
+    TEST_ASSERT(t[1].checkLinkageUpLeftRightBF(&t[2], Zzzzz, Zzzzz, 00));
+    remove(&root, &t[1]);
+    TEST_ASSERT_EQUAL(&t[16], root);
+    print(root);
+    TEST_ASSERT(t[2].checkLinkageUpLeftRightBF(&t[4], Zzzzz, &t[3], +1));
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(21, checkAscension(root));
 }
 
 }  // namespace

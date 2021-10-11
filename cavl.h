@@ -46,6 +46,9 @@ struct Cavl
     Cavl*  lr[2];  ///< Left child (lesser), right child (greater).
     int8_t bf;     ///< Balance factor is positive when right-heavy. Allowed values are {-1, 0, +1}.
 };
+#if defined(static_assert) || defined(__cplusplus)
+static_assert(sizeof(Cavl) <= sizeof(void* [4]));
+#endif
 
 /// Returns positive if the search target is greater than the provided node, negative if smaller, zero on match (found).
 typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
@@ -68,9 +71,10 @@ static inline Cavl* cavlSearch(Cavl** const        root,
                                const CavlPredicate predicate,
                                const CavlFactory   factory);
 
-/// Remove the specified node from its tree. The root node may be replaced in the process. UB if node not in the tree.
+/// Remove the specified node from its tree. The root node may be replaced in the process.
 /// The worst-case complexity is O(log n).
 /// The function has no effect if either of the pointers are NULL.
+/// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
 static inline void cavlRemove(Cavl** const root, const Cavl* const node);
 
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
@@ -258,7 +262,11 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             {
                 p = re->up;  // Retracing starts with the ex-parent of our replacement node.
                 assert(p->lr[0] == re);
-                p->lr[0]      = re->lr[1];  // Reducing the height of the left subtree here.
+                p->lr[0] = re->lr[1];  // Reducing the height of the left subtree here.
+                if (p->lr[0] != NULL)
+                {
+                    p->lr[0]->up = p;
+                }
                 re->lr[1]     = node->lr[1];
                 re->lr[1]->up = re;
                 r             = false;
@@ -290,6 +298,10 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             {
                 r        = p->lr[1] == node;
                 p->lr[r] = node->lr[rr];
+                if (p->lr[r] != NULL)
+                {
+                    p->lr[r]->up = p;
+                }
             }
             else
             {
