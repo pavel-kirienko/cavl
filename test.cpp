@@ -143,6 +143,36 @@ inline void traverse(Node* const root, const Visitor& visitor)
 }
 
 template <typename T>
+void printGraphviz(const Node<T>* const nd)
+{
+    TEST_ASSERT_LESS_THAN(12, getHeight(nd));  // Fail early for malformed cyclic trees, do not overwhelm stdout.
+    std::puts("// Feed the following text to Graphviz, or use an online UI like https://edotor.net/");
+    std::puts("digraph {");
+    std::puts(
+        "node [style=filled,shape=circle,fontcolor=white,penwidth=0,fontname=\"monospace\",fixedsize=1,fontsize=18];");
+    std::puts("nodesep=0.1;ranksep=0.3;");
+    traverse<true>(nd, [](const Node<T>* const x) {
+        const char* const fill_color = (x->bf == 0) ? "black" : ((x->bf > 0) ? "orange" : "blue");
+        std::printf("\"%u\"[fillcolor=%s];", unsigned(x->value), fill_color);
+    });
+    traverse<true>(nd, [](const Node<T>* const x) {
+        if (x->lr[0] != nullptr)
+        {
+            std::printf("\"%u\":w->\"%u\":n;",
+                        unsigned(x->value),
+                        unsigned(reinterpret_cast<Node<T>*>(x->lr[0])->value));
+        }
+        if (x->lr[1] != nullptr)
+        {
+            std::printf("\"%u\":e->\"%u\":n;",
+                        unsigned(x->value),
+                        unsigned(reinterpret_cast<Node<T>*>(x->lr[1])->value));
+        }
+    });
+    std::puts("\n}");
+}
+
+template <typename T>
 std::optional<std::size_t> checkAscension(const Node<T>* const root)
 {
     const Node<T>* prev  = nullptr;
@@ -1364,7 +1394,7 @@ void testMutationRandomized()
     {
         std::printf("\tmin/max:      %u/%u\n", unsigned(root->min()->value), unsigned(root->max()->value));
     }
-    print(root);
+    printGraphviz(root);
     validate();
 }
 
