@@ -51,12 +51,12 @@ struct Cavl
 static_assert(sizeof(Cavl) <= sizeof(void* [4]));
 #endif
 
-/// Returns positive if the search target is greater than the provided node, negative if smaller, zero on match (found).
+/// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
 /// Values other than {-1, 0, +1} are not recommended to avoid overflow during the narrowing conversion of the result.
 typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
 
-/// If provided, the factory is invoked if the sought node could not be found.
-/// It is expected to return a new node that will be inserted immediately without the need to traverse the tree again.
+/// If provided, the factory will be invoked when the sought node does not exist in the tree.
+/// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef Cavl* (*CavlFactory)(void* user_reference);
 
@@ -64,7 +64,7 @@ typedef Cavl* (*CavlFactory)(void* user_reference);
 /// - If the node is found, return it.
 /// - If the node is not found and the factory is NULL, return NULL.
 /// - Otherwise, construct a new node using the factory; if the result is not NULL, insert it; return the result.
-/// The user_reference is passed into the predicate/factory unmodified.
+/// The user_reference is passed into the predicate & factory unmodified.
 /// The root node may be replaced in the process.
 /// If predicate is NULL, returns NULL.
 static inline Cavl* cavlSearch(Cavl** const        root,
