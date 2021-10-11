@@ -92,7 +92,7 @@ static inline Cavl* cavlFindExtremum(Cavl* const root, const bool maximum)
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
 /// INTERNAL USE ONLY. Makes '!r' child of 'x' its parent; i.e., rotates toward 'r'.
-static inline Cavl* _cavlRotate(Cavl* const x, const bool r)
+static inline void _cavlRotate(Cavl* const x, const bool r)
 {
     assert((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     Cavl* const z = x->lr[!r];
@@ -108,7 +108,6 @@ static inline Cavl* _cavlRotate(Cavl* const x, const bool r)
         x->lr[!r]->up = x;
     }
     z->lr[r] = x;
-    return z;
 }
 
 /// INTERNAL USE ONLY.
@@ -127,7 +126,8 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
         assert(z != NULL);        // Heavy side cannot be empty.
         if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
         {
-            out = _cavlRotate(x, r);
+            out = z;
+            _cavlRotate(x, r);
             if (z->bf == 0)
             {
                 x->bf = (int8_t) (-sign);
@@ -143,8 +143,9 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
         {
             Cavl* const y = z->lr[r];
             assert(y != NULL);  // Heavy side cannot be empty.
-            (void) _cavlRotate(z, !r);
-            out = _cavlRotate(x, r);
+            out = y;
+            _cavlRotate(z, !r);
+            _cavlRotate(x, r);
             if ((y->bf * sign) < 0)
             {
                 x->bf = (int8_t) (+sign);

@@ -167,7 +167,7 @@ void testRotation()
     print(&x);
 
     std::printf("After left rotation:\n");
-    TEST_ASSERT_EQUAL(&z, _cavlRotate(&x, false));
+    _cavlRotate(&x, false);  // z is now the root
     TEST_ASSERT_NULL(findBrokenAncestry(&z));
     print(&z);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
@@ -176,7 +176,7 @@ void testRotation()
     TEST_ASSERT_EQUAL(&c, z.lr[1]);
 
     std::printf("After right rotation, back into the original configuration:\n");
-    TEST_ASSERT_EQUAL(&x, _cavlRotate(&z, true));
+    _cavlRotate(&z, true);  // x is now the root
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
     print(&x);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
