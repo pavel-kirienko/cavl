@@ -36,23 +36,22 @@ extern "C" {
 
 // ----------------------------------------         PUBLIC API SECTION         ----------------------------------------
 
-/// The tree node/root. The user data is represented by a single untyped pointer.
+/// The tree node/root. The user data is to be added through composition/inheritance.
+/// The memory layout of this type is compatible with void*[4], which is useful if this type cannot be exposed in API.
 /// Per standard convention, nodes that compare smaLLer are put on the Left; those that are laRgeR are on the Right.
 typedef struct Cavl Cavl;
 struct Cavl
 {
-    void*  value;  ///< The user data stored in this node.
     Cavl*  up;     ///< Parent node, NULL in the root.
     Cavl*  lr[2];  ///< Left child (lesser), right child (greater).
     int8_t bf;     ///< Balance factor is positive when right-heavy. Allowed values are {-1, 0, +1}.
 };
 
-/// Returns positive if the search target is greater than the node value, negative if smaller, zero on match (found).
+/// Returns positive if the search target is greater than the provided node, negative if smaller, zero on match (found).
 typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
 
 /// If provided, the factory is invoked if the searched node could not be found.
 /// It is expected to return a new node that will be inserted immediately without the need to traverse the tree again.
-/// All fields of the returned node will be initialized by the library except for the user 'value' pointer.
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef Cavl* (*CavlFactory)(void* user_reference);
 

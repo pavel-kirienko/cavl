@@ -18,11 +18,72 @@ constexpr auto Zz     = nullptr;
 constexpr auto Zzzzz  = nullptr;
 constexpr auto Zzzzzz = nullptr;
 
-void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker = 'T')
+template <typename T>
+struct Node final : Cavl
+{
+    explicit Node(const T val) : Cavl{Cavl{}}, value(val) {}
+    Node(const Cavl& cv, const T val) : Cavl{cv}, value(val) {}
+    Node() : Cavl{Cavl{}} {}
+
+    T value{};
+
+    Node* min() { return reinterpret_cast<Node*>(cavlFindExtremum(this, false)); }
+    Node* max() { return reinterpret_cast<Node*>(cavlFindExtremum(this, true)); }
+
+    Node& operator=(const Cavl& cv)
+    {
+        static_cast<Cavl&>(*this) = cv;
+        return *this;
+    }
+};
+
+/// Wrapper over cavlSearch() that supports closures.
+template <typename T, typename Predicate, typename Factory>
+Node<T>* search(Node<T>** const root, const Predicate& predicate, const Factory& factory)
+{
+    struct Refs
+    {
+        Predicate predicate;
+        Factory   factory;
+
+        static std::int8_t callPredicate(void* const user_reference, const Cavl* const node)
+        {
+            const auto ret = static_cast<Refs*>(user_reference)->predicate(reinterpret_cast<const Node<T>&>(*node));
+            if (ret > 0)
+            {
+                return 1;
+            }
+            if (ret < 0)
+            {
+                return -1;
+            }
+            return 0;
+        }
+
+        static Cavl* callFactory(void* const user_reference) { return static_cast<Refs*>(user_reference)->factory(); }
+    } refs{predicate, factory};
+    Cavl* const out = cavlSearch(reinterpret_cast<Cavl**>(root), &refs, &Refs::callPredicate, &Refs::callFactory);
+    return reinterpret_cast<Node<T>*>(out);
+}
+template <typename T, typename Predicate>
+Node<T>* search(Node<T>** const root, const Predicate& predicate)
+{
+    return search<T, Predicate>(root, predicate, []() { return nullptr; });
+}
+
+/// Wrapper over cavlRemove().
+template <typename T>
+void remove(Node<T>** const root, const Node<T>* const n)
+{
+    cavlRemove(reinterpret_cast<Cavl**>(root), n);
+}
+
+template <typename T>
+void print(const Node<T>* const nd, const std::uint8_t depth = 0, const char marker = 'T')
 {
     if (nd != nullptr)
     {
-        print(nd->lr[0], static_cast<std::uint8_t>(depth + 1U), 'L');
+        print<T>(reinterpret_cast<const Node<T>*>(nd->lr[0]), static_cast<std::uint8_t>(depth + 1U), 'L');
         for (std::uint16_t i = 1U; i < depth; i++)
         {
             std::printf("              ");
@@ -39,8 +100,8 @@ void print(const Cavl* const nd, const std::uint8_t depth = 0, const char marker
         {
             (void) 0;
         }
-        std::printf("%c=%llu [%d]\n", marker, reinterpret_cast<unsigned long long>(nd->value), nd->bf);
-        print(nd->lr[1], static_cast<std::uint8_t>(depth + 1U), 'R');
+        std::printf("%c=%lld [%d]\n", marker, static_cast<long long>(nd->value), nd->bf);
+        print<T>(reinterpret_cast<const Node<T>*>(nd->lr[1]), static_cast<std::uint8_t>(depth + 1U), 'R');
     }
 }
 
@@ -49,18 +110,19 @@ inline void traverse(Node* const root, const Visitor& visitor)
 {
     if (root != nullptr)
     {
-        traverse<Ascending, Node, Visitor>(root->lr[!Ascending], visitor);
+        traverse<Ascending, Node, Visitor>(reinterpret_cast<Node*>(root->lr[!Ascending]), visitor);
         visitor(root);
-        traverse<Ascending, Node, Visitor>(root->lr[Ascending], visitor);
+        traverse<Ascending, Node, Visitor>(reinterpret_cast<Node*>(root->lr[Ascending]), visitor);
     }
 }
 
-std::optional<std::size_t> checkAscension(const Cavl* const root)
+template <typename T>
+std::optional<std::size_t> checkAscension(const Node<T>* const root)
 {
-    const Cavl* prev  = nullptr;
-    bool        valid = true;
-    std::size_t size  = 0;
-    traverse<true, const Cavl>(root, [&](const Cavl* const nd) {
+    const Node<T>* prev  = nullptr;
+    bool           valid = true;
+    std::size_t    size  = 0;
+    traverse<true, const Node<T>>(root, [&](const Node<T>* const nd) {
         if (prev != nullptr)
         {
             valid = valid && (prev->value < nd->value);
@@ -71,13 +133,14 @@ std::optional<std::size_t> checkAscension(const Cavl* const root)
     return valid ? std::optional<std::size_t>(size) : std::optional<std::size_t>{};
 }
 
-const Cavl* findBrokenAncestry(const Cavl* const n, const Cavl* const parent = nullptr)
+template <typename T>
+const Node<T>* findBrokenAncestry(const Node<T>* const n, const Cavl* const parent = nullptr)
 {
     if ((n != nullptr) && (n->up == parent))
     {
         for (auto* ch : n->lr)
         {
-            if (const Cavl* p = findBrokenAncestry(ch, n))
+            if (const Node<T>* p = findBrokenAncestry(reinterpret_cast<Node<T>*>(ch), n))
             {
                 return p;
             }
@@ -87,24 +150,28 @@ const Cavl* findBrokenAncestry(const Cavl* const n, const Cavl* const parent = n
     return n;
 }
 
-std::uint8_t getHeight(const Cavl* const n)
+template <typename T>
+std::uint8_t getHeight(const Node<T>* const n)
 {
-    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(n->lr[0]), getHeight(n->lr[1]))) : 0;
+    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(reinterpret_cast<Node<T>*>(n->lr[0])),
+                                                       getHeight(reinterpret_cast<Node<T>*>(n->lr[1]))))
+                          : 0;
 }
 
-const Cavl* findBrokenBalanceFactor(const Cavl* const n)
+template <typename T>
+const Cavl* findBrokenBalanceFactor(const Node<T>* const n)
 {
     if (n != nullptr)
     {
-        const std::int16_t hl = getHeight(n->lr[0]);
-        const std::int16_t hr = getHeight(n->lr[1]);
+        const std::int16_t hl = getHeight(reinterpret_cast<Node<T>*>(n->lr[0]));
+        const std::int16_t hr = getHeight(reinterpret_cast<Node<T>*>(n->lr[1]));
         if (n->bf != (hr - hl))
         {
             return n;
         }
         for (auto* ch : n->lr)
         {
-            if (const Cavl* p = findBrokenBalanceFactor(ch))
+            if (const Cavl* p = findBrokenBalanceFactor(reinterpret_cast<Node<T>*>(ch)))
             {
                 return p;
             }
@@ -115,14 +182,11 @@ const Cavl* findBrokenBalanceFactor(const Cavl* const n)
 
 void testCheckAscension()
 {
-    Cavl t{};
-    Cavl l{};
-    Cavl r{};
-    Cavl rr{};
-    t.value  = reinterpret_cast<void*>(2);
-    l.value  = reinterpret_cast<void*>(1);
-    r.value  = reinterpret_cast<void*>(3);
-    rr.value = reinterpret_cast<void*>(4);
+    using N = Node<std::uint8_t>;
+    N t{2};
+    N l{1};
+    N r{3};
+    N rr{4};
     // Correctly arranged tree -- smaller items on the left.
     t.lr[0] = &l;
     t.lr[1] = &r;
@@ -142,6 +206,7 @@ void testCheckAscension()
 
 void testRotation()
 {
+    using N = Node<std::uint8_t>;
     // Original state:
     //      x.left  = a
     //      x.right = z
@@ -152,11 +217,11 @@ void testRotation()
     //      x.right = b
     //      z.left  = x
     //      z.right = c
-    Cavl c{reinterpret_cast<void*>(3), Zz, {Zz, Zz}, 0};
-    Cavl b{reinterpret_cast<void*>(2), Zz, {Zz, Zz}, 0};
-    Cavl a{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, 0};
-    Cavl z{reinterpret_cast<void*>(8), Zz, {&b, &c}, 0};
-    Cavl x{reinterpret_cast<void*>(9), Zz, {&a, &z}, 1};
+    N c{{Zz, {Zz, Zz}, 0}, 3};
+    N b{{Zz, {Zz, Zz}, 0}, 2};
+    N a{{Zz, {Zz, Zz}, 0}, 1};
+    N z{{Zz, {&b, &c}, 0}, 8};
+    N x{{Zz, {&a, &z}, 1}, 9};
     z.up = &x;
     c.up = &z;
     b.up = &z;
@@ -187,6 +252,7 @@ void testRotation()
 
 void testBalancingA()
 {
+    using N = Node<std::uint8_t>;
     // Double left-right rotation.
     //     X             X           Y
     //    / `           / `        /   `
@@ -195,13 +261,13 @@ void testBalancingA()
     // D   Y         Z   G      D   F G   C
     //    / `       / `
     //   F   G     D   F
-    Cavl x{reinterpret_cast<void*>(1), Zz, {Zz, Zz}, 0};  // bf = -2
-    Cavl z{reinterpret_cast<void*>(2), &x, {Zz, Zz}, 0};  // bf = +1
-    Cavl c{reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
-    Cavl d{reinterpret_cast<void*>(4), &z, {Zz, Zz}, 0};
-    Cavl y{reinterpret_cast<void*>(5), &z, {Zz, Zz}, 0};
-    Cavl f{reinterpret_cast<void*>(6), &y, {Zz, Zz}, 0};
-    Cavl g{reinterpret_cast<void*>(7), &y, {Zz, Zz}, 0};
+    N x{{Zz, {Zz, Zz}, 0}, 1};  // bf = -2
+    N z{{&x, {Zz, Zz}, 0}, 2};  // bf = +1
+    N c{{&x, {Zz, Zz}, 0}, 3};
+    N d{{&z, {Zz, Zz}, 0}, 4};
+    N y{{&z, {Zz, Zz}, 0}, 5};
+    N f{{&y, {Zz, Zz}, 0}, 6};
+    N g{{&y, {Zz, Zz}, 0}, 7};
     x.lr[0] = &z;
     x.lr[1] = &c;
     z.lr[0] = &d;
@@ -236,6 +302,7 @@ void testBalancingA()
 
 void testBalancingB()
 {
+    using N = Node<std::uint8_t>;
     // Without F the handling of Z and Y is more complex; Z flips the sign of its balance factor:
     //     X             X           Y
     //    / `           / `        /   `
@@ -244,18 +311,18 @@ void testBalancingB()
     // D   Y         Z   G      D     G   C
     //      `       /
     //       G     D
-    Cavl x{};
-    Cavl z{};
-    Cavl c{};
-    Cavl d{};
-    Cavl y{};
-    Cavl g{};
-    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, 0};  // bf = -2
-    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, 0};  // bf = +1
-    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
-    d = {reinterpret_cast<void*>(4), &z, {Zz, Zz}, 0};
-    y = {reinterpret_cast<void*>(5), &z, {Zz, &g}, 0};  // bf = +1
-    g = {reinterpret_cast<void*>(7), &y, {Zz, Zz}, 0};
+    N x{};
+    N z{};
+    N c{};
+    N d{};
+    N y{};
+    N g{};
+    x = {{Zz, {&z, &c}, 0}, 1};  // bf = -2
+    z = {{&x, {&d, &y}, 0}, 2};  // bf = +1
+    c = {{&x, {Zz, Zz}, 0}, 3};
+    d = {{&z, {Zz, Zz}, 0}, 4};
+    y = {{&z, {Zz, &g}, 0}, 5};  // bf = +1
+    g = {{&y, {Zz, Zz}, 0}, 7};
     print(&x);
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
     TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
@@ -284,6 +351,7 @@ void testBalancingB()
 
 void testBalancingC()
 {
+    using N = Node<std::uint8_t>;
     // Both X and Z are heavy on the same side.
     //       X              Z
     //      / `           /   `
@@ -292,20 +360,20 @@ void testBalancingC()
     //   D   Y         F   G Y   C
     //  / `
     // F   G
-    Cavl x{};
-    Cavl z{};
-    Cavl c{};
-    Cavl d{};
-    Cavl y{};
-    Cavl f{};
-    Cavl g{};
-    x = {reinterpret_cast<void*>(1), Zz, {&z, &c}, 0};  // bf = -2
-    z = {reinterpret_cast<void*>(2), &x, {&d, &y}, 0};  // bf = -1
-    c = {reinterpret_cast<void*>(3), &x, {Zz, Zz}, 0};
-    d = {reinterpret_cast<void*>(4), &z, {&f, &g}, 0};
-    y = {reinterpret_cast<void*>(5), &z, {Zz, Zz}, 0};
-    f = {reinterpret_cast<void*>(6), &d, {Zz, Zz}, 0};
-    g = {reinterpret_cast<void*>(7), &d, {Zz, Zz}, 0};
+    N x{};
+    N z{};
+    N c{};
+    N d{};
+    N y{};
+    N f{};
+    N g{};
+    x = {{Zz, {&z, &c}, 0}, 1};  // bf = -2
+    z = {{&x, {&d, &y}, 0}, 2};  // bf = -1
+    c = {{&x, {Zz, Zz}, 0}, 3};
+    d = {{&z, {&f, &g}, 0}, 4};
+    y = {{&z, {Zz, Zz}, 0}, 5};
+    f = {{&d, {Zz, Zz}, 0}, 6};
+    g = {{&d, {Zz, Zz}, 0}, 7};
     print(&x);
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
     TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
@@ -334,7 +402,12 @@ void testBalancingC()
 
 void testRetracingOnGrowth()
 {
-    Cavl t[100]{};
+    using N = Node<std::uint8_t>;
+    N t[100]{};
+    for (std::uint8_t i = 0; i < 100; i++)
+    {
+        t[i].value = i;
+    }
     //        50              30
     //      /   `            /   `
     //     30   60?   =>    20   50
@@ -342,12 +415,12 @@ void testRetracingOnGrowth()
     //   20 40?           10   40? 60?
     //  /
     // 10
-    t[50] = {reinterpret_cast<void*>(50), Zzzzzz, {&t[30], &t[60]}, -1};
-    t[30] = {reinterpret_cast<void*>(30), &t[50], {&t[20], &t[40]}, 0};
-    t[60] = {reinterpret_cast<void*>(60), &t[50], {Zzzzzz, Zzzzzz}, 0};
-    t[20] = {reinterpret_cast<void*>(20), &t[30], {&t[10], Zzzzzz}, 0};
-    t[40] = {reinterpret_cast<void*>(40), &t[30], {Zzzzzz, Zzzzzz}, 0};
-    t[10] = {reinterpret_cast<void*>(10), &t[20], {Zzzzzz, Zzzzzz}, 0};
+    t[50] = {Zzzzzz, {&t[30], &t[60]}, -1};
+    t[30] = {&t[50], {&t[20], &t[40]}, 00};
+    t[60] = {&t[50], {Zzzzzz, Zzzzzz}, 00};
+    t[20] = {&t[30], {&t[10], Zzzzzz}, 00};
+    t[40] = {&t[30], {Zzzzzz, Zzzzzz}, 00};
+    t[10] = {&t[20], {Zzzzzz, Zzzzzz}, 00};
     print(&t[50]);  // The tree is imbalanced because we just added 1 and are about to retrace it.
     TEST_ASSERT_NULL(findBrokenAncestry(&t[50]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[50]));
@@ -372,7 +445,6 @@ void testRetracingOnGrowth()
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[30]));
     // Add a new child under 20 and ensure that retracing stops at 20 because it becomes perfectly balanced:
-    //
     //          30
     //         /   `
     //       20    50
@@ -380,7 +452,7 @@ void testRetracingOnGrowth()
     //     10 21 40 60
     TEST_ASSERT_NULL(findBrokenAncestry(&t[30]));
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
-    t[21]       = {reinterpret_cast<void*>(21), &t[20], {Zzzzzz, Zzzzzz}, 0};
+    t[21]       = {&t[20], {Zzzzzz, Zzzzzz}, 0};
     t[20].lr[1] = &t[21];
     TEST_ASSERT_NULL(_cavlRetraceOnGrowth(&t[21]));  // Root not reached, NULL returned.
     std::puts("ADD 21:");
@@ -447,7 +519,7 @@ void testRetracingOnGrowth()
     TEST_ASSERT_NULL(findBrokenAncestry(&t[30]));
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
     TEST_ASSERT_EQUAL(7, checkAscension(&t[30]));
-    t[15]       = {reinterpret_cast<void*>(15), &t[10], {Zzzzzz, Zzzzzz}, 0};
+    t[15]       = {&t[10], {Zzzzzz, Zzzzzz}, 0};
     t[10].lr[1] = &t[15];
     TEST_ASSERT_EQUAL(&t[30], _cavlRetraceOnGrowth(&t[15]));  // Same root, its balance becomes -1.
     print(&t[30]);
@@ -459,7 +531,7 @@ void testRetracingOnGrowth()
     TEST_ASSERT_EQUAL(8, checkAscension(&t[30]));
 
     std::puts("ADD 17:");
-    t[17]       = {reinterpret_cast<void*>(17), &t[15], {Zzzzzz, Zzzzzz}, 0};
+    t[17]       = {&t[15], {Zzzzzz, Zzzzzz}, 0};
     t[15].lr[1] = &t[17];
     TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[17]));  // Same root, same balance, 10 rotated left.
     print(&t[30]);
@@ -494,7 +566,7 @@ void testRetracingOnGrowth()
     TEST_ASSERT_EQUAL(9, checkAscension(&t[30]));
 
     std::puts("ADD 18:");
-    t[18]       = {reinterpret_cast<void*>(18), &t[17], {Zzzzzz, Zzzzzz}, 0};
+    t[18]       = {&t[17], {Zzzzzz, Zzzzzz}, 0};
     t[17].lr[1] = &t[18];
     TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[18]));  // Same root, 15 went left, 20 went right.
     print(&t[30]);
@@ -534,65 +606,53 @@ void testRetracingOnGrowth()
     TEST_ASSERT_EQUAL(10, checkAscension(&t[30]));
 }
 
-int8_t predicate(void* const user_reference, const Cavl* const node)
-{
-    TEST_ASSERT_NOT_NULL(user_reference);
-    Cavl* const left = static_cast<Cavl*>(user_reference);
-    if (left->value > node->value)
-    {
-        return +1;
-    }
-    if (left->value < node->value)
-    {
-        return -1;
-    }
-    return 0;
-}
-
 void testSearchTrivial()
 {
+    using N = Node<std::uint8_t>;
     //      A
     //    B   C
     //   D E F G
-    Cavl a{};
-    Cavl b{};
-    Cavl c{};
-    Cavl d{};
-    Cavl e{};
-    Cavl f{};
-    Cavl g{};
-    Cavl q{};
-    a = {reinterpret_cast<void*>(4), Zz, {&b, &c}, 0};
-    b = {reinterpret_cast<void*>(2), &a, {&d, &e}, 0};
-    c = {reinterpret_cast<void*>(6), &a, {&f, &g}, 0};
-    d = {reinterpret_cast<void*>(1), &b, {Zz, Zz}, 0};
-    e = {reinterpret_cast<void*>(3), &b, {Zz, Zz}, 0};
-    f = {reinterpret_cast<void*>(5), &c, {Zz, Zz}, 0};
-    g = {reinterpret_cast<void*>(7), &c, {Zz, Zz}, 0};
-    q = {reinterpret_cast<void*>(9), Zz, {Zz, Zz}, 0};
+    N a{4};
+    N b{2};
+    N c{6};
+    N d{1};
+    N e{3};
+    N f{5};
+    N g{7};
+    N q{9};
+    a = {Zz, {&b, &c}, 0};
+    b = {&a, {&d, &e}, 0};
+    c = {&a, {&f, &g}, 0};
+    d = {&b, {Zz, Zz}, 0};
+    e = {&b, {Zz, Zz}, 0};
+    f = {&c, {Zz, Zz}, 0};
+    g = {&c, {Zz, Zz}, 0};
+    q = {Zz, {Zz, Zz}, 0};
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&a));
     TEST_ASSERT_NULL(findBrokenAncestry(&a));
     TEST_ASSERT_EQUAL(7, checkAscension(&a));
-    Cavl* root = &a;
-    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, nullptr, nullptr));    // Bad arguments.
-    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
-    TEST_ASSERT_NULL(cavlSearch(&root, &q, predicate, nullptr));       // Item not found.
-    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
-    TEST_ASSERT_EQUAL(&e, cavlSearch(&root, &e, predicate, nullptr));  // Item found.
-    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
+    N* root = &a;
+    TEST_ASSERT_NULL(cavlSearch(reinterpret_cast<Cavl**>(&root), nullptr, nullptr, nullptr));  // Bad arguments.
+    TEST_ASSERT_EQUAL(&a, root);
+    TEST_ASSERT_NULL(search(&root, [&](const N& v) { return q.value - v.value; }));
+    TEST_ASSERT_EQUAL(&a, root);
+    TEST_ASSERT_EQUAL(&e, search(&root, [&](const N& v) { return e.value - v.value; }));
+    TEST_ASSERT_EQUAL(&b, search(&root, [&](const N& v) { return b.value - v.value; }));
+    TEST_ASSERT_EQUAL(&a, root);
     print(&a);
     TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, true));
     TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, false));
-    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&a, true));
-    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&a, false));
-    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&g, true));
-    TEST_ASSERT_EQUAL(&g, cavlFindExtremum(&g, false));
-    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&d, true));
-    TEST_ASSERT_EQUAL(&d, cavlFindExtremum(&d, false));
+    TEST_ASSERT_EQUAL(&g, a.max());
+    TEST_ASSERT_EQUAL(&d, a.min());
+    TEST_ASSERT_EQUAL(&g, g.max());
+    TEST_ASSERT_EQUAL(&g, g.min());
+    TEST_ASSERT_EQUAL(&d, d.max());
+    TEST_ASSERT_EQUAL(&d, d.min());
 }
 
 void testRemovalA()
 {
+    using N = Node<std::uint8_t>;
     //        4
     //      /   `
     //    2       6
@@ -600,17 +660,21 @@ void testRemovalA()
     //  1   3   5   8
     //             / `
     //            7   9
-    Cavl t[10]{};
-    t[1]       = {reinterpret_cast<void*>(1), &t[2], {Zzzzz, Zzzzz}, 00};
-    t[2]       = {reinterpret_cast<void*>(2), &t[4], {&t[1], &t[3]}, 00};
-    t[3]       = {reinterpret_cast<void*>(3), &t[2], {Zzzzz, Zzzzz}, 00};
-    t[4]       = {reinterpret_cast<void*>(4), Zzzzz, {&t[2], &t[6]}, +1};
-    t[5]       = {reinterpret_cast<void*>(5), &t[6], {Zzzzz, Zzzzz}, 00};
-    t[6]       = {reinterpret_cast<void*>(6), &t[4], {&t[5], &t[8]}, +1};
-    t[7]       = {reinterpret_cast<void*>(7), &t[8], {Zzzzz, Zzzzz}, 00};
-    t[8]       = {reinterpret_cast<void*>(8), &t[6], {&t[7], &t[9]}, 00};
-    t[9]       = {reinterpret_cast<void*>(9), &t[8], {Zzzzz, Zzzzz}, 00};
-    Cavl* root = &t[4];
+    N t[10]{};
+    for (std::uint8_t i = 0; i < 10; i++)
+    {
+        t[i].value = i;
+    }
+    t[1]    = {&t[2], {Zzzzz, Zzzzz}, 00};
+    t[2]    = {&t[4], {&t[1], &t[3]}, 00};
+    t[3]    = {&t[2], {Zzzzz, Zzzzz}, 00};
+    t[4]    = {Zzzzz, {&t[2], &t[6]}, +1};
+    t[5]    = {&t[6], {Zzzzz, Zzzzz}, 00};
+    t[6]    = {&t[4], {&t[5], &t[8]}, +1};
+    t[7]    = {&t[8], {Zzzzz, Zzzzz}, 00};
+    t[8]    = {&t[6], {&t[7], &t[9]}, 00};
+    t[9]    = {&t[8], {Zzzzz, Zzzzz}, 00};
+    N* root = &t[4];
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
     TEST_ASSERT_NULL(findBrokenAncestry(root));
@@ -625,7 +689,7 @@ void testRemovalA()
     //             /
     //            7
     std::puts("REMOVE 9:");
-    cavlRemove(&root, &t[9]);
+    remove(&root, &t[9]);
     TEST_ASSERT_EQUAL(&t[4], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -679,7 +743,7 @@ void testRemovalA()
     //   / `     / `
     //  1   3   5   7
     std::puts("REMOVE 8:");
-    cavlRemove(&root, &t[8]);
+    remove(&root, &t[8]);
     TEST_ASSERT_EQUAL(&t[4], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -728,7 +792,7 @@ void testRemovalA()
     //   / `       `
     //  1   3       7
     std::puts("REMOVE 4:");
-    cavlRemove(&root, &t[4]);
+    remove(&root, &t[4]);
     TEST_ASSERT_EQUAL(&t[5], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -772,7 +836,7 @@ void testRemovalA()
     //   / `
     //  1   3
     std::puts("REMOVE 5:");
-    cavlRemove(&root, &t[5]);
+    remove(&root, &t[5]);
     TEST_ASSERT_EQUAL(&t[6], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -811,7 +875,7 @@ void testRemovalA()
     //            /
     //           3
     std::puts("REMOVE 6:");
-    cavlRemove(&root, &t[6]);
+    remove(&root, &t[6]);
     TEST_ASSERT_EQUAL(&t[2], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -843,7 +907,7 @@ void testRemovalA()
     //        /   `
     //       2     7
     std::puts("REMOVE 1:");
-    cavlRemove(&root, &t[1]);
+    remove(&root, &t[1]);
     TEST_ASSERT_EQUAL(&t[3], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -870,7 +934,7 @@ void testRemovalA()
     //        /
     //       2
     std::puts("REMOVE 7:");
-    cavlRemove(&root, &t[7]);
+    remove(&root, &t[7]);
     TEST_ASSERT_EQUAL(&t[3], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -889,7 +953,7 @@ void testRemovalA()
 
     // Remove 3. Only 2 is left, which is now obviously the root.
     std::puts("REMOVE 3:");
-    cavlRemove(&root, &t[3]);
+    remove(&root, &t[3]);
     TEST_ASSERT_EQUAL(&t[2], root);
     print(root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -903,17 +967,13 @@ void testRemovalA()
 
     // Remove 2. The tree is now empty, make sure the root pointer is updated accordingly.
     std::puts("REMOVE 2:");
-    cavlRemove(&root, &t[2]);
+    remove(&root, &t[2]);
     TEST_ASSERT_EQUAL(nullptr, root);
-}
-
-Cavl* factory(void* const user_reference)
-{
-    return static_cast<Cavl*>(user_reference);
 }
 
 void testMutationManual()
 {
+    using N = Node<std::uint8_t>;
     // Build a tree with 31 elements from 1 to 31 inclusive by adding new elements successively:
     //                               16
     //                       /               `
@@ -924,18 +984,19 @@ void testMutationManual()
     //   2       6      10      14      18      22      26      30
     //  / `     / `     / `     / `     / `     / `     / `     / `
     // 1   3   5   7   9  11  13  15  17  19  21  23  25  27  29  31
-    Cavl t[32]{};
+    N t[32]{};
     for (std::uint8_t i = 0; i < 32; i++)
     {
-        t[i].value = reinterpret_cast<void*>(i);
+        t[i].value = i;
     }
     // Build the actual tree.
-    Cavl* root = nullptr;
+    N* root = nullptr;
     for (std::uint8_t i = 1; i < 32; i++)
     {
-        TEST_ASSERT_NULL(cavlSearch(&root, &t[i], &predicate, nullptr));           // No such node yet.
-        TEST_ASSERT_EQUAL(&t[i], cavlSearch(&root, &t[i], &predicate, &factory));  // Add the node.
-        TEST_ASSERT_EQUAL(&t[i], cavlSearch(&root, &t[i], &predicate, nullptr));   // Find the node we just added.
+        const auto pred = [&](const N& v) { return t[i].value - v.value; };
+        TEST_ASSERT_NULL(search(&root, pred));
+        TEST_ASSERT_EQUAL(&t[i], search(&root, pred, [&]() { return &t[i]; }));
+        TEST_ASSERT_EQUAL(&t[i], search(&root, pred));
         // Validate the tree after every mutation.
         TEST_ASSERT_NOT_NULL(root);
         TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
@@ -949,9 +1010,9 @@ void testMutationManual()
     // Check composition -- ensure that every element is in the tree and it is there exactly once.
     {
         bool seen[32]{};
-        traverse<true>(root, [&](const Cavl* const n) {
-            TEST_ASSERT_FALSE(seen[reinterpret_cast<std::size_t>(n->value)]);
-            seen[reinterpret_cast<std::size_t>(n->value)] = true;
+        traverse<true>(root, [&](const N* const n) {
+            TEST_ASSERT_FALSE(seen[n->value]);
+            seen[n->value] = true;
         });
         TEST_ASSERT(std::all_of(&seen[1], &seen[31], [](bool x) { return x; }));
     }
