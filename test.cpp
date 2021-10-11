@@ -534,13 +534,15 @@ void testRetracingOnGrowth()
     TEST_ASSERT_EQUAL(10, checkAscension(&t[30]));
 }
 
-int8_t predicate(void* const value, const Cavl* const node)
+int8_t predicate(void* const user_reference, const Cavl* const node)
 {
-    if (value > node->value)
+    TEST_ASSERT_NOT_NULL(user_reference);
+    Cavl* const left = static_cast<Cavl*>(user_reference);
+    if (left->value > node->value)
     {
         return +1;
     }
-    if (value < node->value)
+    if (left->value < node->value)
     {
         return -1;
     }
@@ -559,6 +561,7 @@ void testSearchTrivial()
     Cavl e{};
     Cavl f{};
     Cavl g{};
+    Cavl q{};
     a = {reinterpret_cast<void*>(4), Zz, {&b, &c}, 0};
     b = {reinterpret_cast<void*>(2), &a, {&d, &e}, 0};
     c = {reinterpret_cast<void*>(6), &a, {&f, &g}, 0};
@@ -566,16 +569,17 @@ void testSearchTrivial()
     e = {reinterpret_cast<void*>(3), &b, {Zz, Zz}, 0};
     f = {reinterpret_cast<void*>(5), &c, {Zz, Zz}, 0};
     g = {reinterpret_cast<void*>(7), &c, {Zz, Zz}, 0};
+    q = {reinterpret_cast<void*>(9), Zz, {Zz, Zz}, 0};
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&a));
     TEST_ASSERT_NULL(findBrokenAncestry(&a));
     TEST_ASSERT_EQUAL(7, checkAscension(&a));
     Cavl* root = &a;
-    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, nullptr, nullptr));         // Bad arguments.
-    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
-    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, predicate, nullptr));       // Item not found.
-    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
-    TEST_ASSERT_EQUAL(&e, cavlSearch(&root, e.value, predicate, nullptr));  // Item found.
-    TEST_ASSERT_EQUAL(&a, root);                                            // Root shall not be altered.
+    TEST_ASSERT_NULL(cavlSearch(&root, nullptr, nullptr, nullptr));    // Bad arguments.
+    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
+    TEST_ASSERT_NULL(cavlSearch(&root, &q, predicate, nullptr));       // Item not found.
+    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
+    TEST_ASSERT_EQUAL(&e, cavlSearch(&root, &e, predicate, nullptr));  // Item found.
+    TEST_ASSERT_EQUAL(&a, root);                                       // Root shall not be altered.
     print(&a);
     TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, true));
     TEST_ASSERT_EQUAL(nullptr, cavlFindExtremum(nullptr, false));
@@ -903,6 +907,104 @@ void testRemovalA()
     TEST_ASSERT_EQUAL(nullptr, root);
 }
 
+Cavl* factory(void* const user_reference)
+{
+    return static_cast<Cavl*>(user_reference);
+}
+
+void testMutationManual()
+{
+    // Build a tree with 31 elements from 1 to 31 inclusive by adding new elements successively:
+    //                               16
+    //                       /               `
+    //               8                              24
+    //           /        `                      /       `
+    //       4              12              20              28
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      26      30
+    //  / `     / `     / `     / `     / `     / `     / `     / `
+    // 1   3   5   7   9  11  13  15  17  19  21  23  25  27  29  31
+    Cavl t[32]{};
+    for (std::uint8_t i = 0; i < 32; i++)
+    {
+        t[i].value = reinterpret_cast<void*>(i);
+    }
+    // Build the actual tree.
+    Cavl* root = nullptr;
+    for (std::uint8_t i = 1; i < 32; i++)
+    {
+        TEST_ASSERT_NULL(cavlSearch(&root, &t[i], &predicate, nullptr));           // No such node yet.
+        TEST_ASSERT_EQUAL(&t[i], cavlSearch(&root, &t[i], &predicate, &factory));  // Add the node.
+        TEST_ASSERT_EQUAL(&t[i], cavlSearch(&root, &t[i], &predicate, nullptr));   // Find the node we just added.
+        // Validate the tree after every mutation.
+        TEST_ASSERT_NOT_NULL(root);
+        TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+        TEST_ASSERT_NULL(findBrokenAncestry(root));
+        TEST_ASSERT_EQUAL(i, checkAscension(root));
+    }
+    print(root);
+    TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+    TEST_ASSERT_NULL(findBrokenAncestry(root));
+    TEST_ASSERT_EQUAL(31, checkAscension(root));
+    // Check composition -- ensure that every element is in the tree and it is there exactly once.
+    {
+        bool seen[32]{};
+        traverse<true>(root, [&](const Cavl* const n) {
+            TEST_ASSERT_FALSE(seen[reinterpret_cast<std::size_t>(n->value)]);
+            seen[reinterpret_cast<std::size_t>(n->value)] = true;
+        });
+        TEST_ASSERT(std::all_of(&seen[1], &seen[31], [](bool x) { return x; }));
+    }
+
+    // REMOVE 24
+    //                               16
+    //                       /               `
+    //               8                              25
+    //           /        `                      /       `
+    //       4              12              20              28
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      26      30
+    //  / `     / `     / `     / `     / `     / `       `     / `
+    // 1   3   5   7   9  11  13  15  17  19  21  23      27  29  31
+    // TODO
+
+    // REMOVE 25
+    //                               16
+    //                       /               `
+    //               8                              26
+    //           /        `                      /       `
+    //       4              12              20              28
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      27      30
+    //  / `     / `     / `     / `     / `     / `             / `
+    // 1   3   5   7   9  11  13  15  17  19  21  23          29  31
+    // TODO
+
+    // REMOVE 26
+    //                               16
+    //                       /               `
+    //               8                              27
+    //           /        `                      /       `
+    //       4              12              20              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      28      31
+    //  / `     / `     / `     / `     / `     / `       `
+    // 1   3   5   7   9  11  13  15  17  19  21  23      29
+    // TODO
+
+    // REMOVE 20
+    //                               16
+    //                       /               `
+    //               8                              27
+    //           /        `                      /       `
+    //       4              12              21              30
+    //     /    `         /    `          /    `          /    `
+    //   2       6      10      14      18      22      28      31
+    //  / `     / `     / `     / `     / `       `       `
+    // 1   3   5   7   9  11  13  15  17  19      23      29
+    // TODO
+}
+
 }  // namespace
 
 int main()
@@ -916,5 +1018,6 @@ int main()
     RUN_TEST(testRetracingOnGrowth);
     RUN_TEST(testSearchTrivial);
     RUN_TEST(testRemovalA);
+    RUN_TEST(testMutationManual);
     return UNITY_END();
 }

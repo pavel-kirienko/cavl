@@ -11,7 +11,6 @@ Checks: >-
   hicpp-*,
   llvm-*,
   misc-*,
-  performance-*,
   portability-*,
   readability-*,
   -modernize-*,
