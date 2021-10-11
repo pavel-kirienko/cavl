@@ -40,6 +40,8 @@ Checks: >-
   -*-avoid-c-arrays,
   -*-no-malloc,
   -misc-no-recursion,
+  -cert-msc30-c,
+  -cert-msc50-cpp,
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*\.hpp'
 AnalyzeTemporaryDtors: false

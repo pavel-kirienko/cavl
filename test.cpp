@@ -6,7 +6,10 @@
 #include <array>
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
+#include <ctime>
 #include <optional>
+#include <numeric>
 
 void setUp() {}
 
@@ -178,6 +181,10 @@ const Cavl* findBrokenBalanceFactor(const Node<T>* const n)
 {
     if (n != nullptr)
     {
+        if (std::abs(n->bf) > 1)
+        {
+            return n;
+        }
         const std::int16_t hl = getHeight(reinterpret_cast<Node<T>*>(n->lr[0]));
         const std::int16_t hr = getHeight(reinterpret_cast<Node<T>*>(n->lr[1]));
         if (n->bf != (hr - hl))
@@ -1257,10 +1264,117 @@ void testMutationManual()
     TEST_ASSERT_EQUAL(21, checkAscension(root));
 }
 
+std::uint8_t getRandomByte()
+{
+    return static_cast<std::uint8_t>((0xFFLL * std::rand()) / RAND_MAX);
+}
+
+void testMutationRandomized()
+{
+    using N = Node<std::uint8_t>;
+    std::array<N, 256> t{};
+    for (auto i = 0U; i < 256U; i++)
+    {
+        t.at(i).value = static_cast<std::uint8_t>(i);
+    }
+    std::array<bool, 256> mask{};
+    std::size_t           size = 0;
+    N*                    root = nullptr;
+
+    std::uint64_t cnt_addition = 0;
+    std::uint64_t cnt_removal  = 0;
+
+    const auto validate = [&]() {
+        TEST_ASSERT_EQUAL(size,
+                          std::accumulate(mask.begin(), mask.end(), 0U, [](const std::size_t a, const std::size_t b) {
+                              return a + b;
+                          }));
+        TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
+        TEST_ASSERT_NULL(findBrokenAncestry(root));
+        TEST_ASSERT_EQUAL(size, checkAscension(root));
+        std::array<bool, 256> new_mask{};
+        traverse<true>(root, [&](const N* node) { new_mask.at(node->value) = true; });
+        TEST_ASSERT_EQUAL(mask, new_mask);  // Otherwise, the contents of the tree does not match our expectations.
+    };
+    validate();
+
+    const auto add = [&](const std::uint8_t x) {
+        const auto predicate = [&](const N& v) { return x - v.value; };
+        if (N* const existing = search(&root, predicate))
+        {
+            TEST_ASSERT_TRUE(mask.at(x));
+            TEST_ASSERT_EQUAL(x, existing->value);
+            TEST_ASSERT_EQUAL(x, search(&root, predicate, []() -> N* {
+                                     TEST_FAIL_MESSAGE("Attempted to create a new node when there is one already");
+                                     return nullptr;
+                                 })->value);
+        }
+        else
+        {
+            TEST_ASSERT_FALSE(mask.at(x));
+            bool factory_called = false;
+            TEST_ASSERT_EQUAL(x, search(&root, predicate, [&]() -> N* {
+                                     factory_called = true;
+                                     return &t.at(x);
+                                 })->value);
+            TEST_ASSERT(factory_called);
+            size++;
+            cnt_addition++;
+            mask.at(x) = true;
+        }
+    };
+
+    const auto drop = [&](const std::uint8_t x) {
+        const auto predicate = [&](const N& v) { return x - v.value; };
+        if (N* const existing = search(&root, predicate))
+        {
+            TEST_ASSERT_TRUE(mask.at(x));
+            TEST_ASSERT_EQUAL(x, existing->value);
+            remove(&root, existing);
+            size--;
+            cnt_removal++;
+            mask.at(x) = false;
+            TEST_ASSERT_NULL(search(&root, predicate));
+        }
+        else
+        {
+            TEST_ASSERT_FALSE(mask.at(x));
+        }
+    };
+
+    std::puts("Running the randomized test...");
+    for (std::uint32_t iteration = 0U; iteration < 100'000U; iteration++)
+    {
+        if ((getRandomByte() % 2U) != 0)
+        {
+            add(getRandomByte());
+        }
+        else
+        {
+            drop(getRandomByte());
+        }
+        validate();
+    }
+
+    std::puts("Randomized test finished. Final state:");
+    std::printf("\tsize:         %u\n", unsigned(size));
+    std::printf("\tcnt_addition: %u\n", unsigned(cnt_addition));
+    std::printf("\tcnt_removal:  %u\n", unsigned(cnt_removal));
+    if (root != nullptr)
+    {
+        std::printf("\tmin/max:      %u/%u\n", unsigned(root->min()->value), unsigned(root->max()->value));
+    }
+    print(root);
+    validate();
+}
+
 }  // namespace
 
-int main()
+int main(const int argc, const char* const argv[])
 {
+    const auto seed = static_cast<unsigned>((argc > 1) ? std::atoll(argv[1]) : std::time(nullptr));  // NOLINT
+    std::printf("Randomness seed: %u\n", seed);
+    std::srand(seed);
     UNITY_BEGIN();
     RUN_TEST(testCheckAscension);
     RUN_TEST(testRotation);
@@ -1271,5 +1385,6 @@ int main()
     RUN_TEST(testSearchTrivial);
     RUN_TEST(testRemovalA);
     RUN_TEST(testMutationManual);
+    RUN_TEST(testMutationRandomized);
     return UNITY_END();
 }

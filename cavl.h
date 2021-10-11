@@ -1,9 +1,10 @@
 /// Source: https://github.com/pavel-kirienko/cavl
+///
 /// Cavl is a single-header C library providing an implementation of AVL tree suitable for deeply embedded systems.
 /// To integrate it into your project, simply copy this file into your source tree.
 ///
-/// Cavl is best used with O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for
-/// hard-real-time high-integrity embedded systems.
+/// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
+/// high-integrity embedded systems.
 ///
 /// Copyright (c) 2021 Pavel Kirienko <pavel@uavcan.org>
 ///
@@ -51,18 +52,18 @@ static_assert(sizeof(Cavl) <= sizeof(void* [4]));
 #endif
 
 /// Returns positive if the search target is greater than the provided node, negative if smaller, zero on match (found).
+/// Values other than {-1, 0, +1} are not recommended to avoid overflow during the narrowing conversion of the result.
 typedef int8_t (*CavlPredicate)(void* user_reference, const Cavl* node);
 
-/// If provided, the factory is invoked if the searched node could not be found.
+/// If provided, the factory is invoked if the sought node could not be found.
 /// It is expected to return a new node that will be inserted immediately without the need to traverse the tree again.
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef Cavl* (*CavlFactory)(void* user_reference);
 
-/// Look for a node in the tree using the specified search predicate. Average/worst-case complexity is O(log n).
+/// Look for a node in the tree using the specified search predicate. The worst-case complexity is O(log n).
 /// - If the node is found, return it.
 /// - If the node is not found and the factory is NULL, return NULL.
-/// - If the node is not found and the factory is not NULL, construct a new node using the factory, insert & return it;
-///   if the factory returned NULL, behave as if factory was NULL.
+/// - Otherwise, construct a new node using the factory; if the result is not NULL, insert it; return the result.
 /// The user_reference is passed into the predicate/factory unmodified.
 /// The root node may be replaced in the process.
 /// If predicate is NULL, returns NULL.
@@ -75,6 +76,9 @@ static inline Cavl* cavlSearch(Cavl** const        root,
 /// The worst-case complexity is O(log n).
 /// The function has no effect if either of the pointers are NULL.
 /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
+/// It is safe to pass the result of cavlSearch() directly as the second argument:
+///     cavlRemove(&root, cavlSearch(&root, user_reference, search_predicate, NULL));
+/// It is recommended to invalidate the pointers stored in the node after its removal.
 static inline void cavlRemove(Cavl** const root, const Cavl* const node);
 
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
@@ -94,7 +98,7 @@ static inline Cavl* cavlFindExtremum(Cavl* const root, const bool maximum)
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
-/// INTERNAL USE ONLY. Makes '!r' child of 'x' its parent; i.e., rotates toward 'r'.
+/// INTERNAL USE ONLY. Makes the '!r' child of node 'x' its parent; i.e., rotates 'x' toward 'r'.
 static inline void _cavlRotate(Cavl* const x, const bool r)
 {
     assert((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
