@@ -160,15 +160,11 @@ void printGraphviz(const Node<T>* const nd)
     traverse<true>(nd, [](const Node<T>* const x) {
         if (x->lr[0] != nullptr)
         {
-            std::printf("%u:sw->%u:n;",
-                        unsigned(x->value),
-                        unsigned(reinterpret_cast<Node<T>*>(x->lr[0])->value));
+            std::printf("%u:sw->%u:n;", unsigned(x->value), unsigned(reinterpret_cast<Node<T>*>(x->lr[0])->value));
         }
         if (x->lr[1] != nullptr)
         {
-            std::printf("%u:se->%u:n;",
-                        unsigned(x->value),
-                        unsigned(reinterpret_cast<Node<T>*>(x->lr[1])->value));
+            std::printf("%u:se->%u:n;", unsigned(x->value), unsigned(reinterpret_cast<Node<T>*>(x->lr[1])->value));
         }
     });
     std::puts("\n}");
@@ -286,7 +282,7 @@ void testRotation()
     print(&x);
 
     std::printf("After left rotation:\n");
-    _cavlRotate(&x, false);  // z is now the root
+    cavlPrivateRotate(&x, false);  // z is now the root
     TEST_ASSERT_NULL(findBrokenAncestry(&z));
     print(&z);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
@@ -295,7 +291,7 @@ void testRotation()
     TEST_ASSERT_EQUAL(&c, z.lr[1]);
 
     std::printf("After right rotation, back into the original configuration:\n");
-    _cavlRotate(&z, true);  // x is now the root
+    cavlPrivateRotate(&z, true);  // x is now the root
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
     print(&x);
     TEST_ASSERT_EQUAL(&a, x.lr[0]);
@@ -330,11 +326,11 @@ void testBalancingA()
     y.lr[1] = &g;
     print(&x);
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(&x, cavlPrivateAdjustBalance(&x, false));  // bf = -1, same topology
     TEST_ASSERT_EQUAL(-1, x.bf);
-    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(&z, cavlPrivateAdjustBalance(&z, true));  // bf = +1, same topology
     TEST_ASSERT_EQUAL(+1, z.bf);
-    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&x, false));  // bf = -2, rotation needed
+    TEST_ASSERT_EQUAL(&y, cavlPrivateAdjustBalance(&x, false));  // bf = -2, rotation needed
     print(&y);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));  // Should be balanced now.
     TEST_ASSERT_NULL(findBrokenAncestry(&y));
@@ -379,13 +375,13 @@ void testBalancingB()
     g = {{&y, {Zz, Zz}, 0}, 7};
     print(&x);
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(&x, cavlPrivateAdjustBalance(&x, false));  // bf = -1, same topology
     TEST_ASSERT_EQUAL(-1, x.bf);
-    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(&z, cavlPrivateAdjustBalance(&z, true));  // bf = +1, same topology
     TEST_ASSERT_EQUAL(+1, z.bf);
-    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&y, true));  // bf = +1, same topology
+    TEST_ASSERT_EQUAL(&y, cavlPrivateAdjustBalance(&y, true));  // bf = +1, same topology
     TEST_ASSERT_EQUAL(+1, y.bf);
-    TEST_ASSERT_EQUAL(&y, _cavlAdjustBalance(&x, false));  // bf = -2, rotation needed
+    TEST_ASSERT_EQUAL(&y, cavlPrivateAdjustBalance(&x, false));  // bf = -2, rotation needed
     print(&y);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&y));  // Should be balanced now.
     TEST_ASSERT_NULL(findBrokenAncestry(&y));
@@ -430,11 +426,11 @@ void testBalancingC()
     g = {{&d, {Zz, Zz}, 0}, 7};
     print(&x);
     TEST_ASSERT_NULL(findBrokenAncestry(&x));
-    TEST_ASSERT_EQUAL(&x, _cavlAdjustBalance(&x, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(&x, cavlPrivateAdjustBalance(&x, false));  // bf = -1, same topology
     TEST_ASSERT_EQUAL(-1, x.bf);
-    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&z, false));  // bf = -1, same topology
+    TEST_ASSERT_EQUAL(&z, cavlPrivateAdjustBalance(&z, false));  // bf = -1, same topology
     TEST_ASSERT_EQUAL(-1, z.bf);
-    TEST_ASSERT_EQUAL(&z, _cavlAdjustBalance(&x, false));
+    TEST_ASSERT_EQUAL(&z, cavlPrivateAdjustBalance(&x, false));
     print(&z);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&z));
     TEST_ASSERT_NULL(findBrokenAncestry(&z));
@@ -478,7 +474,7 @@ void testRetracingOnGrowth()
     print(&t[50]);  // The tree is imbalanced because we just added 1 and are about to retrace it.
     TEST_ASSERT_NULL(findBrokenAncestry(&t[50]));
     TEST_ASSERT_EQUAL(6, checkAscension(&t[50]));
-    TEST_ASSERT_EQUAL(&t[30], _cavlRetraceOnGrowth(&t[10]));
+    TEST_ASSERT_EQUAL(&t[30], cavlPrivateRetraceOnGrowth(&t[10]));
     std::puts("ADD 10:");
     print(&t[30]);  // This is the new root.
     TEST_ASSERT_EQUAL(&t[20], t[30].lr[0]);
@@ -508,7 +504,7 @@ void testRetracingOnGrowth()
     TEST_ASSERT_NULL(findBrokenBalanceFactor(&t[30]));
     t[21]       = {&t[20], {Zzzzzz, Zzzzzz}, 0};
     t[20].lr[1] = &t[21];
-    TEST_ASSERT_NULL(_cavlRetraceOnGrowth(&t[21]));  // Root not reached, NULL returned.
+    TEST_ASSERT_NULL(cavlPrivateRetraceOnGrowth(&t[21]));  // Root not reached, NULL returned.
     std::puts("ADD 21:");
     print(&t[30]);
     TEST_ASSERT_EQUAL(0, t[20].bf);
@@ -575,7 +571,7 @@ void testRetracingOnGrowth()
     TEST_ASSERT_EQUAL(7, checkAscension(&t[30]));
     t[15]       = {&t[10], {Zzzzzz, Zzzzzz}, 0};
     t[10].lr[1] = &t[15];
-    TEST_ASSERT_EQUAL(&t[30], _cavlRetraceOnGrowth(&t[15]));  // Same root, its balance becomes -1.
+    TEST_ASSERT_EQUAL(&t[30], cavlPrivateRetraceOnGrowth(&t[15]));  // Same root, its balance becomes -1.
     print(&t[30]);
     TEST_ASSERT_EQUAL(+1, t[10].bf);
     TEST_ASSERT_EQUAL(-1, t[20].bf);
@@ -587,7 +583,7 @@ void testRetracingOnGrowth()
     std::puts("ADD 17:");
     t[17]       = {&t[15], {Zzzzzz, Zzzzzz}, 0};
     t[15].lr[1] = &t[17];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[17]));  // Same root, same balance, 10 rotated left.
+    TEST_ASSERT_EQUAL(nullptr, cavlPrivateRetraceOnGrowth(&t[17]));  // Same root, same balance, 10 rotated left.
     print(&t[30]);
     // Check 10
     TEST_ASSERT_EQUAL(&t[15], t[10].up);
@@ -622,7 +618,7 @@ void testRetracingOnGrowth()
     std::puts("ADD 18:");
     t[18]       = {&t[17], {Zzzzzz, Zzzzzz}, 0};
     t[17].lr[1] = &t[18];
-    TEST_ASSERT_EQUAL(nullptr, _cavlRetraceOnGrowth(&t[18]));  // Same root, 15 went left, 20 went right.
+    TEST_ASSERT_EQUAL(nullptr, cavlPrivateRetraceOnGrowth(&t[18]));  // Same root, 15 went left, 20 went right.
     print(&t[30]);
     // Check 17
     TEST_ASSERT_EQUAL(&t[30], t[17].up);

@@ -30,8 +30,7 @@
 
 #ifdef __cplusplus
 // This is, strictly speaking, useless because we do not define any functions with external linkage here,
-// but it tells static analyzers that what follows should be interpreted as C code rather than C++, where
-// identifiers starting with "_" are allowed in the global scope, C-style casts are allowed, etc.
+// but it tells static analyzers that what follows should be interpreted as C code rather than C++.
 extern "C" {
 #endif
 
@@ -48,7 +47,7 @@ struct Cavl
     int8_t bf;     ///< Balance factor is positive when right-heavy. Allowed values are {-1, 0, +1}.
 };
 #if defined(static_assert) || defined(__cplusplus)
-static_assert(sizeof(Cavl) <= sizeof(void* [4]));
+static_assert(sizeof(Cavl) <= sizeof(void* [4]), "Bad size");
 #endif
 
 /// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
@@ -99,7 +98,7 @@ static inline Cavl* cavlFindExtremum(Cavl* const root, const bool maximum)
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
 /// INTERNAL USE ONLY. Makes the '!r' child of node 'x' its parent; i.e., rotates 'x' toward 'r'.
-static inline void _cavlRotate(Cavl* const x, const bool r)
+static inline void cavlPrivateRotate(Cavl* const x, const bool r)
 {
     assert((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     Cavl* const z = x->lr[!r];
@@ -120,7 +119,7 @@ static inline void _cavlRotate(Cavl* const x, const bool r)
 /// INTERNAL USE ONLY.
 /// Accepts a node and how its balance factor needs to be changed -- either +1 or -1.
 /// Returns the new node to replace the old one if tree rotation took place, same node otherwise.
-static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
+static inline Cavl* cavlPrivateAdjustBalance(Cavl* const x, const bool increment)
 {
     assert((x != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     Cavl*        out    = x;
@@ -134,7 +133,7 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
         if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
         {
             out = z;
-            _cavlRotate(x, r);
+            cavlPrivateRotate(x, r);
             if (z->bf == 0)
             {
                 x->bf = (int8_t) (-sign);
@@ -151,8 +150,8 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
             Cavl* const y = z->lr[r];
             assert(y != NULL);  // Heavy side cannot be empty.
             out = y;
-            _cavlRotate(z, !r);
-            _cavlRotate(x, r);
+            cavlPrivateRotate(z, !r);
+            cavlPrivateRotate(x, r);
             if ((y->bf * sign) < 0)
             {
                 x->bf = (int8_t) (+sign);
@@ -182,7 +181,7 @@ static inline Cavl* _cavlAdjustBalance(Cavl* const x, const bool increment)
 /// INTERNAL USE ONLY.
 /// Takes the culprit node (the one that is added); returns NULL or the root of the tree (possibly new one).
 /// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
-static inline Cavl* _cavlRetraceOnGrowth(Cavl* const added)
+static inline Cavl* cavlPrivateRetraceOnGrowth(Cavl* const added)
 {
     assert((added != NULL) && (added->bf == 0));
     Cavl* c = added;      // Child
@@ -191,7 +190,7 @@ static inline Cavl* _cavlRetraceOnGrowth(Cavl* const added)
     {
         const bool r = p->lr[1] == c;  // c is the right child of parent
         assert(p->lr[r] == c);
-        c = _cavlAdjustBalance(p, r);
+        c = cavlPrivateAdjustBalance(p, r);
         p = c->up;
         if (c->bf == 0)
         {           // The height change of the subtree made this parent perfectly balanced (as all things should be),
@@ -234,7 +233,7 @@ static inline Cavl* cavlSearch(Cavl** const        root,
                 out->lr[1]     = NULL;
                 out->up        = up;
                 out->bf        = 0;
-                Cavl* const rt = _cavlRetraceOnGrowth(out);
+                Cavl* const rt = cavlPrivateRetraceOnGrowth(out);
                 if (rt != NULL)
                 {
                     *root = rt;
@@ -321,7 +320,7 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             Cavl* c = NULL;
             for (;;)
             {
-                c = _cavlAdjustBalance(p, !r);
+                c = cavlPrivateAdjustBalance(p, !r);
                 p = c->up;
                 if ((c->bf != 0) || (p == NULL))  // Reached the root or the height difference is absorbed by c.
                 {
