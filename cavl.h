@@ -1,7 +1,7 @@
 /// Source: https://github.com/pavel-kirienko/cavl
 ///
 /// Cavl is a single-header C library providing an implementation of AVL tree suitable for deeply embedded systems.
-/// To integrate it into your project, simply copy this file into your source tree.
+/// To integrate it into your project, simply copy this file into your source tree. Read the API docs below.
 ///
 /// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
 /// high-integrity embedded systems.
@@ -39,7 +39,7 @@ extern "C" {
 
 /// The tree node/root. The user data is to be added through composition/inheritance.
 /// The memory layout of this type is compatible with void*[4], which is useful if this type cannot be exposed in API.
-/// Per standard convention, nodes that compare smaLLer are put on the Left; those that are laRgeR are on the Right.
+/// Per standard convention, nodes that compare smaller are put on the left.
 typedef struct Cavl Cavl;
 struct Cavl
 {

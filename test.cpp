@@ -150,21 +150,23 @@ void printGraphviz(const Node<T>* const nd)
     std::puts("digraph {");
     std::puts(
         "node [style=filled,shape=circle,fontcolor=white,penwidth=0,fontname=\"monospace\",fixedsize=1,fontsize=18];");
-    std::puts("nodesep=0.1;ranksep=0.3;");
+    std::puts("edge [arrowhead=none,penwidth=2];");
+    std::puts("nodesep=0.0;ranksep=0.3;splines=false;");
     traverse<true>(nd, [](const Node<T>* const x) {
         const char* const fill_color = (x->bf == 0) ? "black" : ((x->bf > 0) ? "orange" : "blue");
-        std::printf("\"%u\"[fillcolor=%s];", unsigned(x->value), fill_color);
+        std::printf("%u[fillcolor=%s];", unsigned(x->value), fill_color);
     });
+    std::puts("");
     traverse<true>(nd, [](const Node<T>* const x) {
         if (x->lr[0] != nullptr)
         {
-            std::printf("\"%u\":w->\"%u\":n;",
+            std::printf("%u:sw->%u:n;",
                         unsigned(x->value),
                         unsigned(reinterpret_cast<Node<T>*>(x->lr[0])->value));
         }
         if (x->lr[1] != nullptr)
         {
-            std::printf("\"%u\":e->\"%u\":n;",
+            std::printf("%u:se->%u:n;",
                         unsigned(x->value),
                         unsigned(reinterpret_cast<Node<T>*>(x->lr[1])->value));
         }
