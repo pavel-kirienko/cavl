@@ -35,14 +35,16 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -pedantic -fstrict
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdouble-promotion -Wswitch-enum -Wfloat-equal -Wundef")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion -Wsign-promo")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wcast-align -Wmissing-declarations")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wtype-limits -Wnon-virtual-dtor")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Woverloaded-virtual -Wsign-promo")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wtype-limits -Wnon-virtual-dtor -Woverloaded-virtual")
 
 add_library(unity STATIC ${CMAKE_CURRENT_SOURCE_DIR}/unity/unity.c)
 target_include_directories(unity SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/unity)
+target_compile_definitions(unity PUBLIC -DUNITY_SHORTHAND_AS_RAW=1 -DUNITY_OUTPUT_COLOR=1)
 
-add_executable(cavl_test ${CMAKE_CURRENT_SOURCE_DIR}/test.cpp)
-target_link_libraries(cavl_test unity)
-target_compile_definitions(cavl_test PUBLIC -DUNITY_SHORTHAND_AS_RAW=1)
+add_executable(test_c ${CMAKE_CURRENT_SOURCE_DIR}/c/test.cpp)
+target_link_libraries(test_c unity)
+add_test("run_test_c" "test_c")
 
-add_test("run_cavl_test" "cavl_test")
+add_executable(test_cpp ${CMAKE_CURRENT_SOURCE_DIR}/c++/test.cpp)
+target_link_libraries(test_cpp unity)
+add_test("run_test_cpp" "test_cpp")
