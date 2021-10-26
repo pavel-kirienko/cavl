@@ -130,7 +130,7 @@ public:
     /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
     /// It is safe to pass the result of search() directly as the second argument:
     ///     Node<T>::remove(root, Node<T>::search(root, search_predicate));
-    static auto remove(Derived*& root, const Node* const node) noexcept
+    static void remove(Derived*& root, const Node* const node) noexcept
     {
         if (node != nullptr)
         {
@@ -225,9 +225,9 @@ public:
     }
 
     /// This is like the const overload of remove() except that the node pointers are invalidated afterward for safety.
-    static auto remove(Derived*& root, Node* const node) noexcept
+    static void remove(Derived*& root, Node* const node) noexcept
     {
-        remove(root, node);
+        remove(root, static_cast<const Node*>(node));
         node->unlink();
     }
 
@@ -492,8 +492,8 @@ public:
     }
 
     /// Wraps NodeType<>::remove().
-    auto remove(const NodeType* const node) const noexcept { return NodeType::remove(root_, node); }
-    auto remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
+    void remove(const NodeType* const node) const noexcept { return NodeType::remove(root_, node); }
+    void remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
 
     /// Wraps NodeType<>::min/max().
     auto min() noexcept -> Derived* { return NodeType::min(root_); }
