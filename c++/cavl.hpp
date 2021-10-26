@@ -1,6 +1,6 @@
 /// Source: https://github.com/pavel-kirienko/cavl
 ///
-/// Cavl is a single-header C library providing an implementation of AVL tree suitable for deeply embedded systems.
+/// Cavl is a single-header C++14 library providing an implementation of AVL tree suitable for deeply embedded systems.
 /// To integrate it into your project, simply copy this file into your source tree. Read the API docs below.
 ///
 /// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
@@ -25,125 +25,493 @@
 
 #include <cassert>
 #include <cstdint>
+#include <type_traits>
 
 namespace cavl
 {
-template <typename T>
+template <typename Derived>
+class Tree;
+
+/// The tree node type shall be composed with the user type through CRTP inheritance.
+/// The worst-case complexity of all operations is O(log n).
+template <typename Derived>
 class Node
 {
+    friend class Tree<Derived>;
+
 public:
-    using Self = T;
+    /// Helper alias of the compatible tree type.
+    using TreeType = Tree<Derived>;
+
+    /// Find a node for which the predicate returns zero, or nullptr if there is no such node or the tree is empty.
+    /// The predicate is invoked with a single argument which is a constant reference to Derived.
+    /// The predicate returns POSITIVE if the search target is GREATER than the provided node, negative if smaller.
+    template <typename Predicate>
+    static auto search(Derived* const root, const Predicate& predicate) noexcept -> Derived*
+    {
+        Derived*       p   = root;
+        Derived* const out = search<Predicate>(p, predicate, []() -> Derived* { return nullptr; });
+        assert(p == root);
+        return out;
+    }
+
+    /// Same but const.
+    template <typename Predicate>
+    static auto search(const Node* const root, const Predicate& predicate) noexcept -> const Derived*
+    {
+        const Node* out = nullptr;
+        const Node* n   = root;
+        while (n != nullptr)
+        {
+            const auto cmp = predicate(*down(n));
+            if (0 == cmp)
+            {
+                out = n;
+                break;
+            }
+            n = n->lr[cmp > 0];
+        }
+        return down(out);
+    }
+
+    /// This is like the regular search function except that if the node is missing, the factory will be invoked
+    /// (without arguments) to construct a new one and insert it into the tree immediately.
+    /// The root node may be replaced in the process. If the factory returns true, the tree is not modified.
+    template <typename Predicate, typename Factory>
+    static auto search(Derived*& root, const Predicate& predicate, const Factory& factory) -> Derived*
+    {
+        Node*  out = nullptr;
+        Node*  up  = root;
+        Node** n   = &root;
+        while (*n != nullptr)
+        {
+            const auto cmp = predicate(static_cast<const Derived&>(**n));
+            if (0 == cmp)
+            {
+                out = *n;
+                break;
+            }
+            up = *n;
+            n  = &(*n)->lr[cmp > 0];
+            assert((nullptr == *n) || ((*n)->up == up));
+        }
+        if (nullptr == out)
+        {
+            out = factory();
+            if (out != nullptr)
+            {
+                *n = out;  // Overwrite the pointer to the new node in the parent node.
+                out->unlink();
+                out->up = up;
+                if (Node* const rt = out->retraceOnGrowth())
+                {
+                    root = down(rt);
+                }
+            }
+        }
+        return down(out);
+    }
+
+    /// Remove the specified node from its tree. The root node may be replaced in the process.
+    /// The function has no effect if the node pointer is nullptr.
+    /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
+    /// It is safe to pass the result of search() directly as the second argument:
+    ///     Node<T>::remove(root, Node<T>::search(root, search_predicate));
+    static auto remove(Derived*& root, const Node* const node) noexcept
+    {
+        if (node != nullptr)
+        {
+            assert(root != nullptr);  // Otherwise, the node would have to be nullptr.
+            assert((node->up != nullptr) || (node == root));
+            Node* p = nullptr;  // The lowest parent node that suffered a shortening of its subtree.
+            bool  r = false;    // Which side of the above was shortened.
+            // The first step is to update the topology and remember the node where to start the retracing from later.
+            // Balancing is not performed yet so we may end up with an unbalanced tree.
+            if ((node->lr[0] != nullptr) && (node->lr[1] != nullptr))
+            {
+                Node* const re = min(node->lr[1]);
+                assert((re != nullptr) && (nullptr == re->lr[0]) && (re->up != nullptr));
+                re->bf        = node->bf;
+                re->lr[0]     = node->lr[0];
+                re->lr[0]->up = re;
+                if (re->up != node)
+                {
+                    p = re->up;  // Retracing starts with the ex-parent of our replacement node.
+                    assert(p->lr[0] == re);
+                    p->lr[0] = re->lr[1];  // Reducing the height of the left subtree here.
+                    if (p->lr[0] != nullptr)
+                    {
+                        p->lr[0]->up = p;
+                    }
+                    re->lr[1]     = node->lr[1];
+                    re->lr[1]->up = re;
+                    r             = false;
+                }
+                else  // In this case, we are reducing the height of the right subtree, so r=1.
+                {
+                    p = re;    // Retracing starts with the replacement node itself as we are deleting its parent.
+                    r = true;  // The right child of the replacement node remains the same so we don't bother relinking
+                               // it.
+                }
+                re->up = node->up;
+                if (re->up != nullptr)
+                {
+                    re->up->lr[re->up->lr[1] == node] = re;  // Replace link in the parent of node.
+                }
+                else
+                {
+                    root = down(re);
+                }
+            }
+            else  // Either or both of the children are nullptr.
+            {
+                p             = node->up;
+                const bool rr = node->lr[1] != nullptr;
+                if (node->lr[rr] != nullptr)
+                {
+                    node->lr[rr]->up = p;
+                }
+                if (p != nullptr)
+                {
+                    r        = p->lr[1] == node;
+                    p->lr[r] = node->lr[rr];
+                    if (p->lr[r] != nullptr)
+                    {
+                        p->lr[r]->up = p;
+                    }
+                }
+                else
+                {
+                    root = down(node->lr[rr]);
+                }
+            }
+            // Now that the topology is updated, perform the retracing to restore balance. We climb up adjusting the
+            // balance factors until we reach the root or a parent whose balance factor becomes plus/minus one, which
+            // means that that parent was able to absorb the balance delta; in other words, the height of the outer
+            // subtree is unchanged, so upper balance factors shall be kept unchanged.
+            if (p != nullptr)
+            {
+                Node* c = nullptr;
+                for (;;)
+                {
+                    c = p->adjustBalance(!r);
+                    p = c->up;
+                    if ((c->bf != 0) || (nullptr == p))  // Reached the root or the height difference is absorbed by c.
+                    {
+                        break;
+                    }
+                    r = p->lr[1] == c;
+                }
+                if (nullptr == p)
+                {
+                    assert(c != nullptr);
+                    root = down(c);
+                }
+            }
+        }
+    }
+
+    /// This is like the const overload of remove() except that the node pointers are invalidated afterward for safety.
+    static auto remove(Derived*& root, Node* const node) noexcept
+    {
+        remove(root, node);
+        node->unlink();
+    }
+
+    /// These methods provide very fast retrieval of min/max values, either const or mutable.
+    static auto min(Node* const root) noexcept -> Derived* { return extremum(root, false); }
+    static auto max(Node* const root) noexcept -> Derived* { return extremum(root, true); }
+    static auto min(const Node* const root) noexcept -> const Derived* { return extremum(root, false); }
+    static auto max(const Node* const root) noexcept -> const Derived* { return extremum(root, true); }
+
+    /// In-order or reverse-in-order traversal of the tree; the visitor is invoked with a reference to each node.
+    /// Required stack depth is about 2*log2(size).
+    template <typename Visitor>
+    static void traverse(Derived* const root, const Visitor& visitor, const bool reverse = false)
+    {
+        if (Node* const n = root)
+        {
+            traverse<Visitor>(n->lr[reverse], visitor, reverse);
+            visitor(*root);
+            traverse<Visitor>(n->lr[!reverse], visitor, reverse);
+        }
+    }
+    template <typename Visitor>
+    static void traverse(const Derived* const root, const Visitor& visitor, const bool reverse = false)
+    {
+        if (const Node* const n = root)
+        {
+            traverse<Visitor>(n->lr[reverse], visitor, reverse);
+            visitor(*root);
+            traverse<Visitor>(n->lr[!reverse], visitor, reverse);
+        }
+    }
 
     // Tree nodes cannot be copied, but they can be moved.
     Node(const Node&) = delete;
     auto operator=(const Node&) -> Node& = delete;
 
-    template <typename Predicate, typename Factory>
-    static auto search(T*& root, const Predicate& predicate, const Factory& factory) -> T*
-    {
-        //
-    }
-
-    template <typename Predicate>
-    static auto search(T*& root, const Predicate& predicate) noexcept -> T*
-    {
-        return search<T, Predicate>(root, predicate, []() -> T* { return nullptr; });
-    }
-
-    template <typename Predicate>
-    static auto search(const T* const root, const Predicate& predicate) noexcept -> const T*
-    {
-        const T* out = nullptr;
-        const T* n   = root;
-        while (n != nullptr)
-        {
-            const auto cmp = predicate(*n);
-            if (cmp == 0)
-            {
-                out = n;
-                break;
-            }
-            n = n->cavl_lr_[cmp > 0];
-        }
-        return out;
-    }
-
-    static auto remove(T*& root, const T* const node) noexcept
-    {
-        //
-    }
-    static auto remove(T*& root, T* const node) noexcept
-    {
-        remove(node);
-        node->cavl_ = Cavl{};
-    }
-
-    static auto findExtremum(T* const root, const bool maximum) noexcept -> T*
-    {
-        T* result = nullptr;
-        T* c      = root;
-        while (c != nullptr)
-        {
-            result = c;
-            c      = c->cavl_lr_[maximum];
-        }
-        return result;
-    }
-    static auto findExtremum(const T* const root, const bool maximum) noexcept -> const T*
-    {
-        const T* result = nullptr;
-        const T* c      = root;
-        while (c != nullptr)
-        {
-            result = c;
-            c      = c->cavl_lr_[maximum];
-        }
-        return result;
-    }
-
 protected:
     Node()  = default;
     ~Node() = default;
 
-    Node(Node&& other) noexcept
+    Node(Node&& other) noexcept : up(other.up), lr{other.lr[0], other.lr[1]}, bf(other.bf)
     {
-        cavl_.up    = other.cavl_.up;
-        cavl_.lr[0] = other.cavl_.lr[0];
-        cavl_.lr[1] = other.cavl_.lr[1];
-        cavl_.bf    = other.cavl_.bf;
-        other.cavl_ = {};
-        // TODO relink
+        other.unlink();
+        if (up != nullptr)
+        {
+            up->lr[up->lr[1] == &other] = this;
+        }
+        for (Node* const s : lr)
+        {
+            if (nullptr != s)
+            {
+                s->up = this;
+            }
+        }
     }
 
     auto operator=(Node&& other) noexcept -> Node&
     {
-        (void) other;
-        // TODO
+        up = other.up;
+        lr = {other.lr[0], other.lr[1]};
+        bf = other.bf;
+        other.unlink();
+        if (up != nullptr)
+        {
+            up->lr[up->lr[1] == &other] = this;
+        }
+        for (Node* const s : lr)
+        {
+            if (nullptr != s)
+            {
+                s->up = this;
+            }
+        }
         return *this;
     }
 
 private:
     void rotate(const bool r) noexcept
     {
-        //
+        assert((lr[!r] != nullptr) && ((bf >= -1) && (bf <= +1)));
+        Node* const z = lr[!r];
+        if (up != nullptr)
+        {
+            up->lr[up->lr[1] == this] = z;
+        }
+        z->up  = up;
+        up     = z;
+        lr[!r] = z->lr[r];
+        if (lr[!r] != nullptr)
+        {
+            lr[!r]->up = this;
+        }
+        z->lr[r] = this;
     }
 
-    auto adjustBalance(const bool increment) noexcept -> T*
+    auto adjustBalance(const bool increment) noexcept -> Node*
     {
-        //
+        assert(((bf >= -1) && (bf <= +1)));
+        Node*      out    = this;
+        const auto new_bf = static_cast<std::int8_t>(bf + (increment ? +1 : -1));
+        if ((new_bf < -1) || (new_bf > 1))
+        {
+            const bool   r    = new_bf < 0;   // bf<0 if left-heavy --> right rotation is needed.
+            const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
+            Node* const  z    = lr[!r];
+            assert(z != nullptr);     // Heavy side cannot be empty.
+            if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
+            {
+                out = z;
+                rotate(r);
+                if (0 == z->bf)
+                {
+                    bf    = static_cast<std::int8_t>(-sign);
+                    z->bf = static_cast<std::int8_t>(+sign);
+                }
+                else
+                {
+                    bf    = 0;
+                    z->bf = 0;
+                }
+            }
+            else  // Otherwise, the child needs to be rotated in the opposite direction first.
+            {
+                Node* const y = z->lr[r];
+                assert(y != nullptr);  // Heavy side cannot be empty.
+                out = y;
+                z->rotate(!r);
+                rotate(r);
+                if ((y->bf * sign) < 0)
+                {
+                    bf    = static_cast<std::int8_t>(+sign);
+                    y->bf = 0;
+                    z->bf = 0;
+                }
+                else if ((y->bf * sign) > 0)
+                {
+                    bf    = 0;
+                    y->bf = 0;
+                    z->bf = static_cast<std::int8_t>(-sign);
+                }
+                else
+                {
+                    bf    = 0;
+                    z->bf = 0;
+                }
+            }
+        }
+        else
+        {
+            bf = new_bf;  // Balancing not needed, just update the balance factor and call it a day.
+        }
+        return out;
     }
 
-    auto retraceOnGrowth() noexcept -> T*
+    auto retraceOnGrowth() noexcept -> Node*
     {
-        //
+        assert(0 == bf);
+        Node* c = this;      // Child
+        Node* p = this->up;  // Parent
+        while (p != nullptr)
+        {
+            const bool r = p->lr[1] == c;  // c is the right child of parent
+            assert(p->lr[r] == c);
+            c = p->adjustBalance(r);
+            p = c->up;
+            if (0 == c->bf)
+            {  // The height change of the subtree made this parent perfectly balanced (as all things should be),
+                break;  // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
+            }
+        }
+        assert(c != nullptr);
+        return (nullptr == p) ? c : nullptr;  // New root or nothing.
     }
 
-    struct Cavl final
+    void unlink() noexcept
     {
-        T*          up = nullptr;
-        T*          lr[2]{};
-        std::int8_t bf = 0;
-    } cavl_;
+        up = nullptr;
+        lr = {nullptr, nullptr};
+        bf = 0;
+    }
+
+    static auto extremum(Node* const root, const bool maximum) noexcept -> Derived*
+    {
+        Node* result = nullptr;
+        Node* c      = root;
+        while (c != nullptr)
+        {
+            result = c;
+            c      = c->lr[maximum];
+        }
+        return down(result);
+    }
+    static auto extremum(const Node* const root, const bool maximum) noexcept -> const Derived*
+    {
+        const Node* result = nullptr;
+        const Node* c      = root;
+        while (c != nullptr)
+        {
+            result = c;
+            c      = c->lr[maximum];
+        }
+        return down(result);
+    }
+
+    // This is MISRA-compliant as long as we are not polymorphic. The derived class may be polymorphic though.
+    static auto down(Node* x) noexcept -> Derived* { return static_cast<Derived*>(x); }
+    static auto down(const Node* x) noexcept -> const Derived* { return static_cast<const Derived*>(x); }
+
+    // The binary layout is compatible with the C version.
+    Node*       up = nullptr;
+    Node*       lr[2]{};
+    std::int8_t bf = 0;
+};
+
+/// This is a very simple convenience wrapper that is entirely optional to use.
+/// It simply keeps a single root pointer of the tree. The methods are mere wrappers over the static methods
+/// defined in the Node<> template class, such that the node pointer kept in the instance of this class is passed
+/// as the first argument of the static methods of Node<>.
+template <typename Derived>
+class Tree final
+{
+public:
+    /// Helper alias of the compatible node type.
+    using NodeType = ::cavl::Node<Derived>;
+
+    Tree()  = default;
+    ~Tree() = default;
+
+    /// Trees cannot be copied.
+    Tree(const Tree&) = delete;
+    auto operator=(const Tree&) -> Tree& = delete;
+
+    /// Trees can be easily moved in constant time.
+    Tree(Tree&& other) noexcept : root_(other.root_) { move(other); }
+    auto operator=(Tree&& other) noexcept -> Tree& { move(other); }
+
+    /// Wraps NodeType<>::search().
+    template <typename Predicate>
+    auto search(const Predicate& predicate) noexcept -> Derived*
+    {
+        return NodeType::template search<Predicate>(root_, predicate);
+    }
+    template <typename Predicate>
+    auto search(const Predicate& predicate) const noexcept -> const Derived*
+    {
+        return NodeType::template search<Predicate>(root_, predicate);
+    }
+    template <typename Predicate, typename Factory>
+    auto search(const Predicate& predicate, const Factory& factory) -> Derived*
+    {
+        return NodeType::template search<Predicate, Factory>(root_, predicate, factory);
+    }
+
+    /// Wraps NodeType<>::remove().
+    auto remove(const NodeType* const node) const noexcept { return NodeType::remove(root_, node); }
+    auto remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
+
+    /// Wraps NodeType<>::min/max().
+    auto min() noexcept -> Derived* { return NodeType::min(root_); }
+    auto max() noexcept -> Derived* { return NodeType::max(root_); }
+    auto min() const noexcept -> const Derived* { return NodeType::min(root_); }
+    auto max() const noexcept -> const Derived* { return NodeType::max(root_); }
+
+    /// Wraps NodeType<>::traverse().
+    template <typename Visitor>
+    auto traverse(const Visitor& visitor, const bool reverse = false)
+    {
+        return NodeType::template traverse<Visitor>(root_, visitor, reverse);
+    }
+    template <typename Visitor>
+    auto traverse(const Visitor& visitor, const bool reverse = false) const
+    {
+        return NodeType::template traverse<Visitor>(root_, visitor, reverse);
+    }
+
+private:
+    static_assert(std::is_base_of_v<NodeType, Derived>, "Invalid usage: CRTP inheritance required");
+    static_assert(!std::is_polymorphic_v<NodeType>);
+    static_assert(std::is_same_v<Tree<Derived>, typename NodeType::Tree>);
+
+    void move(Tree&& other) noexcept
+    {
+        root_       = other.root_;
+        other.root_ = nullptr;
+        if (root_ != nullptr)
+        {
+            for (NodeType* const s : static_cast<NodeType*>(root_)->lr)
+            {
+                if (nullptr != s)
+                {
+                    s->up = root_;
+                }
+            }
+        }
+    }
+
+    Derived* root_ = nullptr;
 };
 
 }  // namespace cavl

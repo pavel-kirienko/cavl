@@ -7,7 +7,7 @@ Generic single-header implementation of AVL tree in C99 and C++14 suitable for d
 and you are ready to roll.**
 The usage instructions are provided in the comments.
 
-A complete test suite is provided in `<lang>/test.cpp`; it includes exhaustive randomized tests.
+Complete test suites are provided in `<lang>/test.cpp`.
 
 For development-related instructions please refer to the CI configuration file.
 To release a new version, simply create a new tag.
