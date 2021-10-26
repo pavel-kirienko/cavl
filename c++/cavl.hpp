@@ -40,30 +40,32 @@ class Node
     friend class Tree<Derived>;
 
 public:
-    /// Helper alias of the compatible tree type.
-    using TreeType = Tree<Derived>;
+    /// Helper aliases.
+    using TreeType    = Tree<Derived>;
+    using DerivedType = Derived;
 
     /// Find a node for which the predicate returns zero, or nullptr if there is no such node or the tree is empty.
     /// The predicate is invoked with a single argument which is a constant reference to Derived.
     /// The predicate returns POSITIVE if the search target is GREATER than the provided node, negative if smaller.
-    template <typename Predicate>
-    static auto search(Derived* const root, const Predicate& predicate) noexcept -> Derived*
+    /// The predicate should be noexcept.
+    template <typename Pre>
+    static auto search(Node* const root, const Pre& predicate) noexcept -> Derived*
     {
-        Derived*       p   = root;
-        Derived* const out = search<Predicate>(p, predicate, []() -> Derived* { return nullptr; });
+        Derived*       p   = down(root);
+        Derived* const out = search<Pre>(p, predicate, []() -> Derived* { return nullptr; });
         assert(p == root);
         return out;
     }
 
     /// Same but const.
-    template <typename Predicate>
-    static auto search(const Node* const root, const Predicate& predicate) noexcept -> const Derived*
+    template <typename Pre>
+    static auto search(const Node* const root, const Pre& predicate) noexcept -> const Derived*
     {
         const Node* out = nullptr;
         const Node* n   = root;
         while (n != nullptr)
         {
-            const auto cmp = predicate(*down(n));
+            const auto cmp = predicate(static_cast<const Derived&>(*down(n)));
             if (0 == cmp)
             {
                 out = n;
@@ -77,30 +79,41 @@ public:
     /// This is like the regular search function except that if the node is missing, the factory will be invoked
     /// (without arguments) to construct a new one and insert it into the tree immediately.
     /// The root node may be replaced in the process. If the factory returns true, the tree is not modified.
-    template <typename Predicate, typename Factory>
-    static auto search(Derived*& root, const Predicate& predicate, const Factory& factory) -> Derived*
+    /// The factory does not need to be noexcept (may throw).
+    template <typename Pre, typename Fac>
+    static auto search(Derived*& root, const Pre& predicate, const Fac& factory) -> Derived*
     {
-        Node*  out = nullptr;
-        Node*  up  = root;
-        Node** n   = &root;
-        while (*n != nullptr)
+        Node* out = nullptr;
+        Node* up  = root;
+        Node* n   = root;
+        bool  r   = false;
+        while (n != nullptr)
         {
-            const auto cmp = predicate(static_cast<const Derived&>(**n));
+            const auto cmp = predicate(static_cast<const Derived&>(*n));
             if (0 == cmp)
             {
-                out = *n;
+                out = n;
                 break;
             }
-            up = *n;
-            n  = &(*n)->lr[cmp > 0];
-            assert((nullptr == *n) || ((*n)->up == up));
+            r  = cmp > 0;
+            up = n;
+            n  = n->lr[r];
+            assert((nullptr == n) || (n->up == up));
         }
         if (nullptr == out)
         {
             out = factory();
             if (out != nullptr)
             {
-                *n = out;  // Overwrite the pointer to the new node in the parent node.
+                if (up != nullptr)
+                {
+                    assert(up->lr[r] == nullptr);
+                    up->lr[r] = out;
+                }
+                else
+                {
+                    root = down(out);
+                }
                 out->unlink();
                 out->up = up;
                 if (Node* const rt = out->retraceOnGrowth())
@@ -226,24 +239,24 @@ public:
 
     /// In-order or reverse-in-order traversal of the tree; the visitor is invoked with a reference to each node.
     /// Required stack depth is about 2*log2(size).
-    template <typename Visitor>
-    static void traverse(Derived* const root, const Visitor& visitor, const bool reverse = false)
+    template <typename Vis>
+    static void traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
     {
         if (Node* const n = root)
         {
-            traverse<Visitor>(n->lr[reverse], visitor, reverse);
-            visitor(*root);
-            traverse<Visitor>(n->lr[!reverse], visitor, reverse);
+            Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);
+            visitor(static_cast<Derived&>(*root));
+            Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
         }
     }
-    template <typename Visitor>
-    static void traverse(const Derived* const root, const Visitor& visitor, const bool reverse = false)
+    template <typename Vis>
+    static void traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
     {
         if (const Node* const n = root)
         {
-            traverse<Visitor>(n->lr[reverse], visitor, reverse);
-            visitor(*root);
-            traverse<Visitor>(n->lr[!reverse], visitor, reverse);
+            Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);
+            visitor(static_cast<const Derived&>(*root));
+            Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
         }
     }
 
@@ -290,6 +303,13 @@ protected:
         }
         return *this;
     }
+
+    /// Accessors for advanced tree introspection. Not needed for typical usage.
+    auto getParentNode() noexcept -> Derived* { return down(up); }
+    auto getParentNode() const noexcept -> const Derived* { return down(up); }
+    auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
+    auto getChildNode(const bool right) const noexcept -> const Derived* { return down(lr[right]); }
+    auto getBalanceFactor() const noexcept { return bf; }
 
 private:
     void rotate(const bool r) noexcept
@@ -391,9 +411,10 @@ private:
 
     void unlink() noexcept
     {
-        up = nullptr;
-        lr = {nullptr, nullptr};
-        bf = 0;
+        up    = nullptr;
+        lr[0] = nullptr;
+        lr[1] = nullptr;
+        bf    = 0;
     }
 
     static auto extremum(Node* const root, const bool maximum) noexcept -> Derived*
@@ -433,12 +454,14 @@ private:
 /// It simply keeps a single root pointer of the tree. The methods are mere wrappers over the static methods
 /// defined in the Node<> template class, such that the node pointer kept in the instance of this class is passed
 /// as the first argument of the static methods of Node<>.
+/// Note that this type is implicitly convertible to Node<>* as the root node.
 template <typename Derived>
 class Tree final
 {
 public:
     /// Helper alias of the compatible node type.
-    using NodeType = ::cavl::Node<Derived>;
+    using NodeType    = ::cavl::Node<Derived>;
+    using DerivedType = Derived;
 
     Tree()  = default;
     ~Tree() = default;
@@ -452,20 +475,20 @@ public:
     auto operator=(Tree&& other) noexcept -> Tree& { move(other); }
 
     /// Wraps NodeType<>::search().
-    template <typename Predicate>
-    auto search(const Predicate& predicate) noexcept -> Derived*
+    template <typename Pre>
+    auto search(const Pre& predicate) noexcept -> Derived*
     {
-        return NodeType::template search<Predicate>(root_, predicate);
+        return NodeType::template search<Pre>(root_, predicate);
     }
-    template <typename Predicate>
-    auto search(const Predicate& predicate) const noexcept -> const Derived*
+    template <typename Pre>
+    auto search(const Pre& predicate) const noexcept -> const Derived*
     {
-        return NodeType::template search<Predicate>(root_, predicate);
+        return NodeType::template search<Pre>(root_, predicate);
     }
-    template <typename Predicate, typename Factory>
-    auto search(const Predicate& predicate, const Factory& factory) -> Derived*
+    template <typename Pre, typename Fac>
+    auto search(const Pre& predicate, const Fac& factory) -> Derived*
     {
-        return NodeType::template search<Predicate, Factory>(root_, predicate, factory);
+        return NodeType::template search<Pre, Fac>(root_, predicate, factory);
     }
 
     /// Wraps NodeType<>::remove().
@@ -479,36 +502,41 @@ public:
     auto max() const noexcept -> const Derived* { return NodeType::max(root_); }
 
     /// Wraps NodeType<>::traverse().
-    template <typename Visitor>
-    auto traverse(const Visitor& visitor, const bool reverse = false)
+    template <typename Vis>
+    auto traverse(const Vis& visitor, const bool reverse = false)
     {
-        return NodeType::template traverse<Visitor>(root_, visitor, reverse);
+        return NodeType::template traverse<Vis>(root_, visitor, reverse);
     }
-    template <typename Visitor>
-    auto traverse(const Visitor& visitor, const bool reverse = false) const
+    template <typename Vis>
+    auto traverse(const Vis& visitor, const bool reverse = false) const
     {
-        return NodeType::template traverse<Visitor>(root_, visitor, reverse);
+        return NodeType::template traverse<Vis>(root_, visitor, reverse);
     }
+
+    /// Normally these are not needed except if advanced introspection is desired.
+    operator Derived*() noexcept { return root_; }              // NOLINT implicit conversion by design
+    operator const Derived*() const noexcept { return root_; }  // NOLINT ditto
+
+    /// Beware that this convenience method has LINEAR COMPLEXITY and uses recursion. Use responsibly.
+    auto size() const noexcept
+    {
+        auto i = 0UL;
+        traverse([&i](auto& /*unused*/) { i++; });
+        return i;
+    }
+
+    /// Unlike size(), this one is constant-complexity.
+    auto empty() const noexcept { return root_ == nullptr; }
 
 private:
     static_assert(std::is_base_of_v<NodeType, Derived>, "Invalid usage: CRTP inheritance required");
     static_assert(!std::is_polymorphic_v<NodeType>);
-    static_assert(std::is_same_v<Tree<Derived>, typename NodeType::Tree>);
+    static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
 
     void move(Tree&& other) noexcept
     {
         root_       = other.root_;
         other.root_ = nullptr;
-        if (root_ != nullptr)
-        {
-            for (NodeType* const s : static_cast<NodeType*>(root_)->lr)
-            {
-                if (nullptr != s)
-                {
-                    s->up = root_;
-                }
-            }
-        }
     }
 
     Derived* root_ = nullptr;
