@@ -478,7 +478,7 @@ public:
     V& operator=(const V&) = delete;
     V& operator=(V&&) = delete;
 
-    [[nodiscard]] virtual auto getValue() const -> std::uint16_t = 0;
+    [[nodiscard]] virtual auto getValue() const -> std::uint8_t = 0;
 
 private:
     using E = struct
@@ -492,17 +492,20 @@ static_assert(std::is_same_v<V::TreeType, VTree>);
 static_assert(std::is_same_v<cavl::Node<V>, VTree::NodeType>);
 
 // Dummy polymorphism for testing purposes.
-template <std::uint16_t Value>
-class VValue : public VValue<Value - 1>
+template <std::uint8_t Value>
+class VValue : public VValue<static_cast<std::uint8_t>(Value - 1)>
 {
 public:
-    [[nodiscard]] auto getValue() const -> std::uint16_t override { return VValue<Value - 1>::getValue() + 1; }
+    [[nodiscard]] auto getValue() const -> std::uint8_t override
+    {
+        return static_cast<std::uint8_t>(VValue<static_cast<std::uint8_t>(Value - 1)>::getValue() + 1);
+    }
 };
 template <>
 class VValue<0> : public V
 {
 public:
-    [[nodiscard]] auto getValue() const -> std::uint16_t override { return 0; }
+    [[nodiscard]] auto getValue() const -> std::uint8_t override { return 0; }
 };
 
 template <std::uint8_t Candidate = 0>
