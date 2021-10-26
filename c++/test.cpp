@@ -10,6 +10,7 @@
 #include <optional>
 #include <iostream>
 #include <sstream>
+#include <memory>
 
 void setUp() {}
 
@@ -18,8 +19,8 @@ void tearDown() {}
 namespace
 {
 /// These aliases are introduced to keep things nicely aligned in test cases.
-constexpr auto Zzzzz  = nullptr;
-constexpr auto Zzzzzz = nullptr;
+constexpr auto Zzzz  = nullptr;
+constexpr auto Zzzzz = nullptr;
 
 /// Simple test -- fully static type with private inheritance.
 class My : public cavl::Node<My>
@@ -47,46 +48,6 @@ private:
 using MyTree = cavl::Tree<My>;
 static_assert(std::is_same_v<My::TreeType, MyTree>);
 static_assert(std::is_same_v<cavl::Node<My>, MyTree::NodeType>);
-
-/// Ensure that polymorphic types can be used with the tree. The tree node type itself is not polymorphic!
-class V : public cavl::Node<V>
-{
-public:
-    using cavl::Node<V>::TreeType;
-    using cavl::Node<V>::getChildNode;
-    using cavl::Node<V>::getParentNode;
-    using cavl::Node<V>::getBalanceFactor;
-
-    V()          = default;
-    virtual ~V() = default;
-    V(const V&)  = delete;
-    V(V&&)       = delete;
-    V& operator=(const V&) = delete;
-    V& operator=(V&&) = delete;
-
-    [[nodiscard]] virtual auto getValue() const -> std::uint16_t = 0;
-
-private:
-    using E = struct
-    {};
-    [[maybe_unused]] E up;
-    [[maybe_unused]] E lr;
-    [[maybe_unused]] E bf;
-};
-using VTree = cavl::Tree<V>;
-static_assert(std::is_same_v<V::TreeType, VTree>);
-static_assert(std::is_same_v<cavl::Node<V>, VTree::NodeType>);
-
-template <std::uint16_t Value>
-class VValue : public VValue<Value - 1>
-{
-    [[nodiscard]] auto getValue() const -> std::uint16_t override { return VValue<Value - 1>::getValue() + 1; }
-};
-template <>
-class VValue<0> : public V
-{
-    [[nodiscard]] auto getValue() const -> std::uint16_t override { return 0; }
-};
 
 template <typename T>
 using N = typename cavl::Node<T>::DerivedType;
@@ -205,10 +166,10 @@ template <typename T>
 }
 
 template <typename N>
-void testManual()
+void testManual(const std::function<N*(std::uint8_t)>& factory)
 {
     using TreeType = typename N::TreeType;
-    std::vector<N> t;
+    std::vector<N*> t;
     // Build a tree with 31 elements from 1 to 31 inclusive by adding new elements successively:
     //                               16
     //                       /               `
@@ -221,19 +182,19 @@ void testManual()
     // 1   3   5   7   9  11  13  15  17  19  21  23  25  27  29  31
     for (std::uint8_t i = 0; i < 32; i++)
     {
-        t.emplace_back(i);
+        t.emplace_back(factory(i));
     }
     // Build the actual tree.
     TreeType tr;
     TEST_ASSERT(tr.empty());
     for (std::uint8_t i = 1; i < 32; i++)
     {
-        const auto pred = [&](const N& v) { return t[i].getValue() - v.getValue(); };
+        const auto pred = [&](const N& v) { return t[i]->getValue() - v.getValue(); };
         TEST_ASSERT_NULL(tr.search(pred));
         TEST_ASSERT_NULL(static_cast<const TreeType&>(tr).search(pred));
-        TEST_ASSERT_EQUAL(&t[i], tr.search(pred, [&]() { return &t[i]; }));
-        TEST_ASSERT_EQUAL(&t[i], tr.search(pred));
-        TEST_ASSERT_EQUAL(&t[i], static_cast<const TreeType&>(tr).search(pred));
+        TEST_ASSERT_EQUAL(t[i], tr.search(pred, [&]() { return t[i]; }));
+        TEST_ASSERT_EQUAL(t[i], tr.search(pred));
+        TEST_ASSERT_EQUAL(t[i], static_cast<const TreeType&>(tr).search(pred));
         // Validate the tree after every mutation.
         TEST_ASSERT(!tr.empty());
         TEST_ASSERT_EQUAL(i, tr.size());
@@ -254,10 +215,10 @@ void testManual()
         });
         TEST_ASSERT(std::all_of(&seen[1], &seen[31], [](bool x) { return x; }));
     }
-    TEST_ASSERT_EQUAL(&t.at(1), tr.min());
-    TEST_ASSERT_EQUAL(&t.at(31), tr.max());
-    TEST_ASSERT_EQUAL(&t.at(1), static_cast<const TreeType&>(tr).min());
-    TEST_ASSERT_EQUAL(&t.at(31), static_cast<const TreeType&>(tr).max());
+    TEST_ASSERT_EQUAL(t.at(1), tr.min());
+    TEST_ASSERT_EQUAL(t.at(31), tr.max());
+    TEST_ASSERT_EQUAL(t.at(1), static_cast<const TreeType&>(tr).min());
+    TEST_ASSERT_EQUAL(t.at(31), static_cast<const TreeType&>(tr).max());
 
     // REMOVE 24
     //                               16
@@ -270,15 +231,15 @@ void testManual()
     //  / `     / `     / `     / `     / `     / `       `     / `
     // 1   3   5   7   9  11  13  15  17  19  21  23      27  29  31
     std::puts("REMOVE 24");
-    TEST_ASSERT(checkLinkage<N>(&t[24], &t[16], {&t[20], &t[28]}, 00));
-    tr.remove(&t[24]);
-    TEST_ASSERT_NULL(t[24].getParentNode());  // Ensure everything has been reset.
-    TEST_ASSERT_NULL(t[24].getChildNode(false));
-    TEST_ASSERT_NULL(t[24].getChildNode(true));
-    TEST_ASSERT_EQUAL(0, t[24].getBalanceFactor());
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[25], &t[16], {&t[20], &t[28]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[26], &t[28], {Zzzzzz, &t[27]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[24], t[16], {t[20], t[28]}, 00));
+    tr.remove(t[24]);
+    TEST_ASSERT_NULL(t[24]->getParentNode());  // Ensure everything has been reset.
+    TEST_ASSERT_NULL(t[24]->getChildNode(false));
+    TEST_ASSERT_NULL(t[24]->getChildNode(true));
+    TEST_ASSERT_EQUAL(0, t[24]->getBalanceFactor());
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[25], t[16], {t[20], t[28]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[26], t[28], {Zzzzz, t[27]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(30, checkOrdering<N>(tr));
@@ -294,11 +255,11 @@ void testManual()
     //  / `     / `     / `     / `     / `     / `             / `
     // 1   3   5   7   9  11  13  15  17  19  21  23          29  31
     std::puts("REMOVE 25");
-    TEST_ASSERT(checkLinkage<N>(&t[25], &t[16], {&t[20], &t[28]}, 00));
-    tr.remove(&t[25]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[26], &t[16], {&t[20], &t[28]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[28], &t[26], {&t[27], &t[30]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[25], t[16], {t[20], t[28]}, 00));
+    tr.remove(t[25]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[26], t[16], {t[20], t[28]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[28], t[26], {t[27], t[30]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(29, checkOrdering<N>(tr));
@@ -314,12 +275,12 @@ void testManual()
     //  / `     / `     / `     / `     / `     / `       `
     // 1   3   5   7   9  11  13  15  17  19  21  23      29
     std::puts("REMOVE 26");
-    TEST_ASSERT(checkLinkage<N>(&t[26], &t[16], {&t[20], &t[28]}, 00));
-    tr.remove(&t[26]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[27], &t[16], {&t[20], &t[30]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[30], &t[27], {&t[28], &t[31]}, -1));
-    TEST_ASSERT(checkLinkage<N>(&t[28], &t[30], {Zzzzzz, &t[29]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[26], t[16], {t[20], t[28]}, 00));
+    tr.remove(t[26]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[27], t[16], {t[20], t[30]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[30], t[27], {t[28], t[31]}, -1));
+    TEST_ASSERT(checkLinkage<N>(t[28], t[30], {Zzzzz, t[29]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(28, checkOrdering<N>(tr));
@@ -335,11 +296,11 @@ void testManual()
     //  / `     / `     / `     / `     / `       `       `
     // 1   3   5   7   9  11  13  15  17  19      23      29
     std::puts("REMOVE 20");
-    TEST_ASSERT(checkLinkage<N>(&t[20], &t[27], {&t[18], &t[22]}, 00));
-    tr.remove(&t[20]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[21], &t[27], {&t[18], &t[22]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[22], &t[21], {Zzzzzz, &t[23]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[20], t[27], {t[18], t[22]}, 00));
+    tr.remove(t[20]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[21], t[27], {t[18], t[22]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[22], t[21], {Zzzzz, t[23]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(27, checkOrdering<N>(tr));
@@ -355,11 +316,11 @@ void testManual()
     //  / `     / `     / `     / `     / `       `
     // 1   3   5   7   9  11  13  15  17  19      23
     std::puts("REMOVE 27");
-    TEST_ASSERT(checkLinkage<N>(&t[27], &t[16], {&t[21], &t[30]}, 00));
-    tr.remove(&t[27]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[28], &t[16], {&t[21], &t[30]}, -1));
-    TEST_ASSERT(checkLinkage<N>(&t[30], &t[28], {&t[29], &t[31]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[27], t[16], {t[21], t[30]}, 00));
+    tr.remove(t[27]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[28], t[16], {t[21], t[30]}, -1));
+    TEST_ASSERT(checkLinkage<N>(t[30], t[28], {t[29], t[31]}, 00));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(26, checkOrdering<N>(tr));
@@ -375,11 +336,11 @@ void testManual()
     //  / `     / `     / `     / `     / `       `
     // 1   3   5   7   9  11  13  15  17  19      23
     std::puts("REMOVE 28");
-    TEST_ASSERT(checkLinkage<N>(&t[28], &t[16], {&t[21], &t[30]}, -1));
-    tr.remove(&t[28]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[29], &t[16], {&t[21], &t[30]}, -1));
-    TEST_ASSERT(checkLinkage<N>(&t[30], &t[29], {Zzzzzz, &t[31]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[28], t[16], {t[21], t[30]}, -1));
+    tr.remove(t[28]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[29], t[16], {t[21], t[30]}, -1));
+    TEST_ASSERT(checkLinkage<N>(t[30], t[29], {Zzzzz, t[31]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(25, checkOrdering<N>(tr));
@@ -406,14 +367,14 @@ void testManual()
     //  / `     / `     / `     / `                       `
     // 1   3   5   7   9  11  13  15                      23
     std::puts("REMOVE 29");
-    TEST_ASSERT(checkLinkage<N>(&t[29], &t[16], {&t[21], &t[30]}, -1));
-    tr.remove(&t[29]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[21], &t[16], {&t[18], &t[30]}, +1));
-    TEST_ASSERT(checkLinkage<N>(&t[18], &t[21], {&t[17], &t[19]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[30], &t[21], {&t[22], &t[31]}, -1));
-    TEST_ASSERT(checkLinkage<N>(&t[22], &t[30], {Zzzzzz, &t[23]}, +1));
-    TEST_ASSERT(checkLinkage<N>(&t[16], Zzzzzz, {&t[8], &t[21]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[29], t[16], {t[21], t[30]}, -1));
+    tr.remove(t[29]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[21], t[16], {t[18], t[30]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[18], t[21], {t[17], t[19]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[30], t[21], {t[22], t[31]}, -1));
+    TEST_ASSERT(checkLinkage<N>(t[22], t[30], {Zzzzz, t[23]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[16], Zzzzz, {t[8], t[21]}, 00));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(24, checkOrdering<N>(tr));
@@ -429,11 +390,11 @@ void testManual()
     //  / `     / `       `     / `                       `
     // 1   3   5   7      11  13  15                      23
     std::puts("REMOVE 8");
-    TEST_ASSERT(checkLinkage<N>(&t[8], &t[16], {&t[4], &t[12]}, 00));
-    tr.remove(&t[8]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[9], &t[16], {&t[4], &t[12]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[10], &t[12], {Zzzzz, &t[11]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[8], t[16], {t[4], t[12]}, 00));
+    tr.remove(t[8]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[9], t[16], {t[4], t[12]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[10], t[12], {Zzzz, t[11]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(23, checkOrdering<N>(tr));
@@ -449,11 +410,11 @@ void testManual()
     //  / `     / `             / `                       `
     // 1   3   5   7          13  15                      23
     std::puts("REMOVE 9");
-    TEST_ASSERT(checkLinkage<N>(&t[9], &t[16], {&t[4], &t[12]}, 00));
-    tr.remove(&t[9]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[10], &t[16], {&t[4], &t[12]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[12], &t[10], {&t[11], &t[14]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[9], t[16], {t[4], t[12]}, 00));
+    tr.remove(t[9]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[10], t[16], {t[4], t[12]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[12], t[10], {t[11], t[14]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(22, checkOrdering<N>(tr));
@@ -469,23 +430,101 @@ void testManual()
     //    `     / `             / `                       `
     //     3   5   7          13  15                      23
     std::puts("REMOVE 1");
-    TEST_ASSERT(checkLinkage<N>(&t[1], &t[2], {Zzzzz, Zzzzz}, 00));
-    tr.remove(&t[1]);
-    TEST_ASSERT_EQUAL(&t[16], static_cast<N*>(tr));
-    TEST_ASSERT(checkLinkage<N>(&t[2], &t[4], {Zzzzz, &t[3]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[1], t[2], {Zzzz, Zzzz}, 00));
+    tr.remove(t[1]);
+    TEST_ASSERT_EQUAL(t[16], static_cast<N*>(tr));
+    TEST_ASSERT(checkLinkage<N>(t[2], t[4], {Zzzz, t[3]}, +1));
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(21, checkOrdering<N>(tr));
 
     // Print the final state for manual inspection. Be sure to compare it against the above diagram for extra paranoia.
     std::cout << toGraphviz(tr) << std::endl;
-    TEST_ASSERT(checkLinkage<N>(&t[16], Zzzzzz, {&t[10], &t[21]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[10], &t[16], {&t[+4], &t[12]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[21], &t[16], {&t[18], &t[30]}, +1));
-    TEST_ASSERT(checkLinkage<N>(&t[+4], &t[10], {&t[+2], &t[+6]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[12], &t[10], {&t[11], &t[14]}, +1));
-    TEST_ASSERT(checkLinkage<N>(&t[18], &t[21], {&t[17], &t[19]}, 00));
-    TEST_ASSERT(checkLinkage<N>(&t[30], &t[21], {&t[22], &t[31]}, -1));
+    TEST_ASSERT(checkLinkage<N>(t[16], Zzzzz, {t[10], t[21]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[10], t[16], {t[+4], t[12]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[21], t[16], {t[18], t[30]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[+4], t[10], {t[+2], t[+6]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[12], t[10], {t[11], t[14]}, +1));
+    TEST_ASSERT(checkLinkage<N>(t[18], t[21], {t[17], t[19]}, 00));
+    TEST_ASSERT(checkLinkage<N>(t[30], t[21], {t[22], t[31]}, -1));
+
+    // Clean up manually to reduce boilerplate in the tests. This is super sloppy but OK for a basic test suite.
+    for (auto* const x : t)
+    {
+        delete x;  // NOLINT
+    }
+}
+
+void testManualMy()
+{
+    testManual<My>([](const std::uint16_t x) {
+        return new My(x);  // NOLINT
+    });
+}
+
+/// Ensure that polymorphic types can be used with the tree. The tree node type itself is not polymorphic!
+class V : public cavl::Node<V>
+{
+public:
+    using cavl::Node<V>::TreeType;
+    using cavl::Node<V>::getChildNode;
+    using cavl::Node<V>::getParentNode;
+    using cavl::Node<V>::getBalanceFactor;
+
+    V()          = default;
+    virtual ~V() = default;
+    V(const V&)  = delete;
+    V(V&&)       = delete;
+    V& operator=(const V&) = delete;
+    V& operator=(V&&) = delete;
+
+    [[nodiscard]] virtual auto getValue() const -> std::uint16_t = 0;
+
+private:
+    using E = struct
+    {};
+    [[maybe_unused]] E up;
+    [[maybe_unused]] E lr;
+    [[maybe_unused]] E bf;
+};
+using VTree = cavl::Tree<V>;
+static_assert(std::is_same_v<V::TreeType, VTree>);
+static_assert(std::is_same_v<cavl::Node<V>, VTree::NodeType>);
+
+// Dummy polymorphism for testing purposes.
+template <std::uint16_t Value>
+class VValue : public VValue<Value - 1>
+{
+public:
+    [[nodiscard]] auto getValue() const -> std::uint16_t override { return VValue<Value - 1>::getValue() + 1; }
+};
+template <>
+class VValue<0> : public V
+{
+public:
+    [[nodiscard]] auto getValue() const -> std::uint16_t override { return 0; }
+};
+
+template <std::uint8_t Candidate = 0>
+auto makeV(const std::uint8_t val) -> V*
+{
+    if (val == Candidate)
+    {
+        return new VValue<Candidate>();  // NOLINT
+    }
+    if constexpr (Candidate < std::numeric_limits<std::uint8_t>::max())
+    {
+        return makeV<Candidate + 1>(val);
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
+void testManualV()
+{
+    testManual<V>(&makeV<>);
 }
 
 }  // namespace
@@ -496,6 +535,7 @@ int main(const int argc, const char* const argv[])
     std::cout << "Randomness seed: " << seed << std::endl;
     std::srand(seed);
     UNITY_BEGIN();
-    RUN_TEST(testManual<My>);
+    RUN_TEST(testManualMy);
+    RUN_TEST(testManualV);
     return UNITY_END();
 }
