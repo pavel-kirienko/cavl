@@ -134,7 +134,7 @@ static inline Cavl* cavlPrivateAdjustBalance(Cavl* const x, const bool increment
         {
             out = z;
             cavlPrivateRotate(x, r);
-            if (z->bf == 0)
+            if (0 == z->bf)
             {
                 x->bf = (int8_t) (-sign);
                 z->bf = (int8_t) (+sign);
@@ -183,7 +183,7 @@ static inline Cavl* cavlPrivateAdjustBalance(Cavl* const x, const bool increment
 /// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
 static inline Cavl* cavlPrivateRetraceOnGrowth(Cavl* const added)
 {
-    assert((added != NULL) && (added->bf == 0));
+    assert((added != NULL) && (0 == added->bf));
     Cavl* c = added;      // Child
     Cavl* p = added->up;  // Parent
     while (p != NULL)
@@ -192,13 +192,13 @@ static inline Cavl* cavlPrivateRetraceOnGrowth(Cavl* const added)
         assert(p->lr[r] == c);
         c = cavlPrivateAdjustBalance(p, r);
         p = c->up;
-        if (c->bf == 0)
+        if (0 == c->bf)
         {           // The height change of the subtree made this parent perfectly balanced (as all things should be),
             break;  // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
         }
     }
     assert(c != NULL);
-    return (p == NULL) ? c : NULL;  // New root or nothing.
+    return (NULL == p) ? c : NULL;  // New root or nothing.
 }
 
 static inline Cavl* cavlSearch(Cavl** const        root,
@@ -214,18 +214,18 @@ static inline Cavl* cavlSearch(Cavl** const        root,
         while (*n != NULL)
         {
             const int8_t cmp = predicate(user_reference, *n);
-            if (cmp == 0)
+            if (0 == cmp)
             {
                 out = *n;
                 break;
             }
             up = *n;
             n  = &(*n)->lr[cmp > 0];
-            assert((*n == NULL) || ((*n)->up == up));
+            assert((NULL == *n) || ((*n)->up == up));
         }
-        if (out == NULL)
+        if (NULL == out)
         {
-            out = (factory == NULL) ? NULL : factory(user_reference);
+            out = (NULL == factory) ? NULL : factory(user_reference);
             if (out != NULL)
             {
                 *n             = out;  // Overwrite the pointer to the new node in the parent node.
@@ -257,7 +257,7 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
         if ((node->lr[0] != NULL) && (node->lr[1] != NULL))
         {
             Cavl* const re = cavlFindExtremum(node->lr[1], false);
-            assert((re != NULL) && (re->lr[0] == NULL) && (re->up != NULL));
+            assert((re != NULL) && (NULL == re->lr[0]) && (re->up != NULL));
             re->bf        = node->bf;
             re->lr[0]     = node->lr[0];
             re->lr[0]->up = re;
@@ -322,13 +322,13 @@ static inline void cavlRemove(Cavl** const root, const Cavl* const node)
             {
                 c = cavlPrivateAdjustBalance(p, !r);
                 p = c->up;
-                if ((c->bf != 0) || (p == NULL))  // Reached the root or the height difference is absorbed by c.
+                if ((c->bf != 0) || (NULL == p))  // Reached the root or the height difference is absorbed by c.
                 {
                     break;
                 }
                 r = p->lr[1] == c;
             }
-            if (p == NULL)
+            if (NULL == p)
             {
                 assert(c != NULL);
                 *root = c;
