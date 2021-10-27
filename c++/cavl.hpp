@@ -471,8 +471,13 @@ public:
     auto operator=(const Tree&) -> Tree& = delete;
 
     /// Trees can be easily moved in constant time.
-    Tree(Tree&& other) noexcept : root_(other.root_) { move(other); }
-    auto operator=(Tree&& other) noexcept -> Tree& { move(other); }
+    Tree(Tree&& other) noexcept : root_(other.root_) { other.root_ = nullptr; }
+    auto operator=(Tree&& other) noexcept -> Tree&
+    {
+        root_       = other.root_;
+        other.root_ = nullptr;
+        return *this;
+    }
 
     /// Wraps NodeType<>::search().
     template <typename Pre>
@@ -532,12 +537,6 @@ private:
     static_assert(std::is_base_of_v<NodeType, Derived>, "Invalid usage: CRTP inheritance required");
     static_assert(!std::is_polymorphic_v<NodeType>);
     static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
-
-    void move(Tree&& other) noexcept
-    {
-        root_       = other.root_;
-        other.root_ = nullptr;
-    }
 
     Derived* root_ = nullptr;
 };

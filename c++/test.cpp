@@ -626,6 +626,17 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t[4], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(1, tr.size());
 
+    // Check the move assignment and move constructor of the tree.
+    TreeType tr2(std::move(tr));
+    TEST_ASSERT_EQUAL(t.at(4), static_cast<N*>(tr2));  // Moved.
+    TEST_ASSERT_NULL(static_cast<N*>(tr));             // NOLINT use after move is intentional.
+    TreeType tr3;
+    TEST_ASSERT_NULL(static_cast<N*>(tr3));
+    tr3 = std::move(tr2);
+    TEST_ASSERT_EQUAL(t.at(4), static_cast<N*>(tr3));  // Moved.
+    TEST_ASSERT_NULL(static_cast<N*>(tr2));            // NOLINT use after move is intentional.
+    TEST_ASSERT_EQUAL(1, tr3.size());
+
     // Clean up manually to reduce boilerplate in the tests. This is super sloppy but OK for a basic test suite.
     for (auto* const x : t)
     {
