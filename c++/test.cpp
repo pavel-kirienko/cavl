@@ -28,10 +28,15 @@ class My : public cavl::Node<My>
 {
 public:
     explicit My(const std::uint16_t v) : value(v) {}
-    using cavl::Node<My>::TreeType;
-    using cavl::Node<My>::getChildNode;
-    using cavl::Node<My>::getParentNode;
-    using cavl::Node<My>::getBalanceFactor;
+    using Self = cavl::Node<My>;
+    using Self::getChildNode;
+    using Self::getParentNode;
+    using Self::getBalanceFactor;
+    using Self::search;
+    using Self::remove;
+    using Self::traverse;
+    using Self::min;
+    using Self::max;
 
     [[nodiscard]] auto getValue() const -> std::uint16_t { return value; }
 
@@ -82,7 +87,7 @@ template <typename T>
     const N<T>* prev  = nullptr;
     bool        valid = true;
     std::size_t size  = 0;
-    cavl::Node<T>::traverse(root, [&](const N<T>& nd) {
+    T::traverse(root, [&](const N<T>& nd) {
         if (prev != nullptr)
         {
             valid = valid && (prev->getValue() < nd.getValue());
@@ -763,10 +768,15 @@ void testManualMy()
 class V : public cavl::Node<V>
 {
 public:
-    using cavl::Node<V>::TreeType;
-    using cavl::Node<V>::getChildNode;
-    using cavl::Node<V>::getParentNode;
-    using cavl::Node<V>::getBalanceFactor;
+    using Self = cavl::Node<V>;
+    using Self::getChildNode;
+    using Self::getParentNode;
+    using Self::getBalanceFactor;
+    using Self::search;
+    using Self::remove;
+    using Self::traverse;
+    using Self::min;
+    using Self::max;
 
     V()          = default;
     virtual ~V() = default;

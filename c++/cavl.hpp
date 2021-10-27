@@ -1,6 +1,6 @@
 /// Source: https://github.com/pavel-kirienko/cavl
 ///
-/// Cavl is a single-header C++14 library providing an implementation of AVL tree suitable for deeply embedded systems.
+/// This is a single-header C++14 library providing an implementation of AVL tree suitable for deeply embedded systems.
 /// To integrate it into your project, simply copy this file into your source tree. Read the API docs below.
 ///
 /// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
@@ -32,17 +32,38 @@ namespace cavl
 template <typename Derived>
 class Tree;
 
-/// The tree node type shall be composed with the user type through CRTP inheritance.
-/// The worst-case complexity of all operations is O(log n).
+/// The tree node type is to be composed with the user type through CRTP inheritance.
+/// The worst-case complexity of all operations is O(log n), unless specifically noted otherwise.
+/// Note that this class has no public members. The user type should re-export them if needed (usually it is not).
+/// The size of this type is 4x pointer size (16 bytes on a 32-bit platform).
 template <typename Derived>
 class Node
 {
-    friend class Tree<Derived>;
-
 public:
     /// Helper aliases.
     using TreeType    = Tree<Derived>;
     using DerivedType = Derived;
+
+    // Tree nodes cannot be copied for obvious reasons.
+    Node(const Node&) = delete;
+    auto operator=(const Node&) -> Node& = delete;
+
+    // They can't be moved either, but the reason is less obvious.
+    // While we can trivially update the pointers in the adjacent nodes to keep the tree valid,
+    // we can't update external references to the tree. This breaks the tree if one attempted to move its root node.
+    Node(Node&& other) = delete;
+    auto operator=(Node&& other) -> Node& = delete;
+
+protected:
+    Node()  = default;
+    ~Node() = default;
+
+    /// Accessors for advanced tree introspection. Not needed for typical usage.
+    auto getParentNode() noexcept -> Derived* { return down(up); }
+    auto getParentNode() const noexcept -> const Derived* { return down(up); }
+    auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
+    auto getChildNode(const bool right) const noexcept -> const Derived* { return down(lr[right]); }
+    auto getBalanceFactor() const noexcept { return bf; }
 
     /// Find a node for which the predicate returns zero, or nullptr if there is no such node or the tree is empty.
     /// The predicate is invoked with a single argument which is a constant reference to Derived.
@@ -65,7 +86,7 @@ public:
         const Node* n   = root;
         while (n != nullptr)
         {
-            const auto cmp = predicate(static_cast<const Derived&>(*down(n)));
+            const auto cmp = predicate(*down(n));
             if (0 == cmp)
             {
                 out = n;
@@ -232,6 +253,7 @@ public:
     }
 
     /// These methods provide very fast retrieval of min/max values, either const or mutable.
+    /// They return nullptr iff the tree is empty.
     static auto min(Node* const root) noexcept -> Derived* { return extremum(root, false); }
     static auto max(Node* const root) noexcept -> Derived* { return extremum(root, true); }
     static auto min(const Node* const root) noexcept -> const Derived* { return extremum(root, false); }
@@ -245,7 +267,7 @@ public:
         if (Node* const n = root)
         {
             Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);
-            visitor(static_cast<Derived&>(*root));
+            visitor(*root);
             Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
         }
     }
@@ -255,30 +277,10 @@ public:
         if (const Node* const n = root)
         {
             Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);
-            visitor(static_cast<const Derived&>(*root));
+            visitor(*root);
             Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
         }
     }
-
-    // Tree nodes cannot be copied for obvious reasons.
-    Node(const Node&) = delete;
-    auto operator=(const Node&) -> Node& = delete;
-    // They can't be moved either, but the reason is less obvious. While we can trivially update the pointers in the
-    // adjacent nodes to keep the tree valid, we can't update external references to the tree. This breaks the tree
-    // if one attempted to move its root node.
-    Node(Node&& other) = delete;
-    auto operator=(Node&& other) -> Node& = delete;
-
-protected:
-    Node()  = default;
-    ~Node() = default;
-
-    /// Accessors for advanced tree introspection. Not needed for typical usage.
-    auto getParentNode() noexcept -> Derived* { return down(up); }
-    auto getParentNode() const noexcept -> const Derived* { return down(up); }
-    auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
-    auto getChildNode(const bool right) const noexcept -> const Derived* { return down(lr[right]); }
-    auto getBalanceFactor() const noexcept { return bf; }
 
 private:
     void rotate(const bool r) noexcept
@@ -413,6 +415,8 @@ private:
     static auto down(Node* x) noexcept -> Derived* { return static_cast<Derived*>(x); }
     static auto down(const Node* x) noexcept -> const Derived* { return static_cast<const Derived*>(x); }
 
+    friend class Tree<Derived>;
+
     // The binary layout is compatible with the C version.
     Node*       up = nullptr;
     Node*       lr[2]{};
@@ -440,7 +444,7 @@ public:
     Tree(const Tree&) = delete;
     auto operator=(const Tree&) -> Tree& = delete;
 
-    /// Trees can be easily moved in constant time.
+    /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
     Tree(Tree&& other) noexcept : root_(other.root_) { other.root_ = nullptr; }
     auto operator=(Tree&& other) noexcept -> Tree&
     {
