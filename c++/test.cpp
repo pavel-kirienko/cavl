@@ -508,21 +508,21 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(19, tr.size());
 
-    // REMOVE TWO BOTTOM ROWS.
+    // REMOVE TWO BOTTOM ROWS. Removal is done in a purposefully complex order to enlarge the coverage.
     //                               17
     //                       /               `
     //               10                             21
     //           /        `                      /       `
     //       4              12              18              30
-    std::puts("REMOVE 3, 5, 7, 13, 15, 2, 6, 11, 14, 19, 23, 31");
-    tr.remove(t[3]);
-    tr.remove(t[5]);
-    tr.remove(t[7]);
-    tr.remove(t[13]);
+    std::puts("REMOVE TWO BOTTOM ROWS");
     tr.remove(t[15]);
-    tr.remove(t[2]);
-    tr.remove(t[6]);
     tr.remove(t[11]);
+    tr.remove(t[5]);
+    tr.remove(t[6]);
+    tr.remove(t[7]);
+    tr.remove(t[3]);
+    tr.remove(t[2]);
+    tr.remove(t[13]);
     tr.remove(t[14]);
     tr.remove(t[19]);
     tr.remove(t[23]);
