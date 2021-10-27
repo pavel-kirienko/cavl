@@ -260,49 +260,18 @@ public:
         }
     }
 
-    // Tree nodes cannot be copied, but they can be moved.
+    // Tree nodes cannot be copied for obvious reasons.
     Node(const Node&) = delete;
     auto operator=(const Node&) -> Node& = delete;
+    // They can't be moved either, but the reason is less obvious. While we can trivially update the pointers in the
+    // adjacent nodes to keep the tree valid, we can't update external references to the tree. This breaks the tree
+    // if one attempted to move its root node.
+    Node(Node&& other) = delete;
+    auto operator=(Node&& other) -> Node& = delete;
 
 protected:
     Node()  = default;
     ~Node() = default;
-
-    Node(Node&& other) noexcept : up(other.up), lr{other.lr[0], other.lr[1]}, bf(other.bf)
-    {
-        other.unlink();
-        if (up != nullptr)
-        {
-            up->lr[up->lr[1] == &other] = this;
-        }
-        for (Node* const s : lr)
-        {
-            if (nullptr != s)
-            {
-                s->up = this;
-            }
-        }
-    }
-
-    auto operator=(Node&& other) noexcept -> Node&
-    {
-        up = other.up;
-        lr = {other.lr[0], other.lr[1]};
-        bf = other.bf;
-        other.unlink();
-        if (up != nullptr)
-        {
-            up->lr[up->lr[1] == &other] = this;
-        }
-        for (Node* const s : lr)
-        {
-            if (nullptr != s)
-            {
-                s->up = this;
-            }
-        }
-        return *this;
-    }
 
     /// Accessors for advanced tree introspection. Not needed for typical usage.
     auto getParentNode() noexcept -> Derived* { return down(up); }
@@ -463,6 +432,7 @@ public:
     using NodeType    = ::cavl::Node<Derived>;
     using DerivedType = Derived;
 
+    explicit Tree(Derived* const root) : root_(root) {}
     Tree()  = default;
     ~Tree() = default;
 
