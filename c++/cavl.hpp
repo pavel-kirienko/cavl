@@ -478,12 +478,12 @@ public:
     template <typename Pre>
     auto search(const Pre& predicate) noexcept -> Derived*
     {
-        return NodeType::template search<Pre>(root_, predicate);
+        return NodeType::template search<Pre>(*this, predicate);
     }
     template <typename Pre>
     auto search(const Pre& predicate) const noexcept -> const Derived*
     {
-        return NodeType::template search<Pre>(root_, predicate);
+        return NodeType::template search<Pre>(*this, predicate);
     }
     template <typename Pre, typename Fac>
     auto search(const Pre& predicate, const Fac& factory) -> Derived*
@@ -496,21 +496,21 @@ public:
     void remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
 
     /// Wraps NodeType<>::min/max().
-    auto min() noexcept -> Derived* { return NodeType::min(root_); }
-    auto max() noexcept -> Derived* { return NodeType::max(root_); }
-    auto min() const noexcept -> const Derived* { return NodeType::min(root_); }
-    auto max() const noexcept -> const Derived* { return NodeType::max(root_); }
+    auto min() noexcept -> Derived* { return NodeType::min(*this); }
+    auto max() noexcept -> Derived* { return NodeType::max(*this); }
+    auto min() const noexcept -> const Derived* { return NodeType::min(*this); }
+    auto max() const noexcept -> const Derived* { return NodeType::max(*this); }
 
     /// Wraps NodeType<>::traverse().
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false)
     {
-        return NodeType::template traverse<Vis>(root_, visitor, reverse);
+        return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false) const
     {
-        return NodeType::template traverse<Vis>(root_, visitor, reverse);
+        return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
 
     /// Normally these are not needed except if advanced introspection is desired.
