@@ -2,6 +2,7 @@
 ///
 /// This is a single-header C++14 library providing an implementation of AVL tree suitable for deeply embedded systems.
 /// To integrate it into your project, simply copy this file into your source tree. Read the API docs below.
+/// The implementation does not use RTTI, exceptions, or dynamic memory.
 ///
 /// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
 /// high-integrity embedded systems.
@@ -33,6 +34,7 @@ template <typename Derived>
 class Tree;
 
 /// The tree node type is to be composed with the user type through CRTP inheritance.
+/// For instance, the derived type might be a key-value pair struct defined in the user code.
 /// The worst-case complexity of all operations is O(log n), unless specifically noted otherwise.
 /// Note that this class has no public members. The user type should re-export them if needed (usually it is not).
 /// The size of this type is 4x pointer size (16 bytes on a 32-bit platform).
