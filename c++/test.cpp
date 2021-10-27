@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <numeric>
 
 void setUp() {}
 
@@ -163,6 +164,11 @@ template <typename T>
     });
     ss << "\n}";
     return ss.str();
+}
+
+auto getRandomByte()
+{
+    return static_cast<std::uint8_t>((0xFFLL * std::rand()) / RAND_MAX);
 }
 
 template <typename N>
@@ -644,6 +650,108 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     }
 }
 
+void testRandomized()
+{
+    std::array<std::shared_ptr<My>, 256> t{};
+    for (std::uint8_t i = 0U; i < 255U; i++)
+    {
+        t.at(i) = std::make_shared<My>(i);
+    }
+    std::array<bool, 256> mask{};
+    std::size_t           size = 0;
+    typename My::TreeType root;
+    std::uint64_t         cnt_addition = 0;
+    std::uint64_t         cnt_removal  = 0;
+
+    const auto validate = [&]() {
+        TEST_ASSERT_EQUAL(size,
+                          std::accumulate(mask.begin(), mask.end(), 0U, [](const std::size_t a, const std::size_t b) {
+                              return a + b;
+                          }));
+        TEST_ASSERT_NULL(findBrokenBalanceFactor<My>(root));
+        TEST_ASSERT_NULL(findBrokenAncestry<My>(root));
+        TEST_ASSERT_EQUAL(size, checkOrdering<My>(root));
+        std::array<bool, 256> new_mask{};
+        root.traverse([&](const My& node) { new_mask.at(node.getValue()) = true; });
+        TEST_ASSERT_EQUAL(mask, new_mask);  // Otherwise, the contents of the tree does not match our expectations.
+    };
+    validate();
+
+    const auto add = [&](const std::uint8_t x) {
+        const auto predicate = [&](const My& v) { return x - v.getValue(); };
+        if (My* const existing = root.search(predicate))
+        {
+            TEST_ASSERT_TRUE(mask.at(x));
+            TEST_ASSERT_EQUAL(x, existing->getValue());
+            TEST_ASSERT_EQUAL(x,
+                              root.search(predicate,
+                                          []() -> My* {
+                                              TEST_FAIL_MESSAGE(
+                                                  "Attempted to create a new node when there is one already");
+                                              return nullptr;
+                                          })
+                                  ->getValue());
+        }
+        else
+        {
+            TEST_ASSERT_FALSE(mask.at(x));
+            bool factory_called = false;
+            TEST_ASSERT_EQUAL(x,
+                              root.search(predicate,
+                                          [&]() -> My* {
+                                              factory_called = true;
+                                              return t.at(x).get();
+                                          })
+                                  ->getValue());
+            TEST_ASSERT(factory_called);
+            size++;
+            cnt_addition++;
+            mask.at(x) = true;
+        }
+    };
+
+    const auto drop = [&](const std::uint8_t x) {
+        const auto predicate = [&](const My& v) { return x - v.getValue(); };
+        if (My* const existing = root.search(predicate))
+        {
+            TEST_ASSERT_TRUE(mask.at(x));
+            TEST_ASSERT_EQUAL(x, existing->getValue());
+            root.remove(existing);
+            size--;
+            cnt_removal++;
+            mask.at(x) = false;
+            TEST_ASSERT_NULL(root.search(predicate));
+        }
+        else
+        {
+            TEST_ASSERT_FALSE(mask.at(x));
+        }
+    };
+
+    std::puts("Running the randomized test...");
+    for (std::uint32_t iteration = 0U; iteration < 100'000U; iteration++)
+    {
+        if ((getRandomByte() % 2U) != 0)
+        {
+            add(getRandomByte());
+        }
+        else
+        {
+            drop(getRandomByte());
+        }
+        validate();
+    }
+
+    std::cout << "Final state:" << std::endl;
+    std::cout << "size=" << size << ", cnt_addition=" << cnt_addition << ", cnt_removal=" << cnt_removal << std::endl;
+    if (root != nullptr)
+    {
+        std::cout << "min/max: " << root.min()->getValue() << "/" << root.max()->getValue() << std::endl;
+    }
+    std::cout << toGraphviz(root) << std::endl;
+    validate();
+}
+
 void testManualMy()
 {
     testManual<My>([](const std::uint16_t x) {
@@ -729,5 +837,6 @@ int main(const int argc, const char* const argv[])
     UNITY_BEGIN();
     RUN_TEST(testManualMy);
     RUN_TEST(testManualV);
+    RUN_TEST(testRandomized);
     return UNITY_END();
 }
