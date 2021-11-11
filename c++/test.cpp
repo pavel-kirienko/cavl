@@ -241,6 +241,17 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(31), tr.max());
     TEST_ASSERT_EQUAL(t.at(1), static_cast<const TreeType&>(tr).min());
     TEST_ASSERT_EQUAL(t.at(31), static_cast<const TreeType&>(tr).max());
+    // Check index operator, both const and mutable.
+    TEST_ASSERT_EQUAL_INT64(10, tr[9]->getValue());
+    TEST_ASSERT_EQUAL_INT64(10, static_cast<const TreeType&>(tr)[9]->getValue());
+    TEST_ASSERT_NULL(tr[32]);
+    TEST_ASSERT_NULL(static_cast<const TreeType&>(tr)[100500UL]);
+    for (auto i = 1U; i <= 31; i++)
+    {
+        TEST_ASSERT_NOT_NULL(tr[i - 1]);
+        TEST_ASSERT_EQUAL_INT64(i, tr[i - 1]->getValue());
+        TEST_ASSERT_EQUAL_INT64(i, static_cast<const TreeType&>(tr)[i - 1]->getValue());
+    }
 
     // REMOVE 24
     //                               16
