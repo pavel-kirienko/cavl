@@ -262,9 +262,31 @@ protected:
     static auto max(const Node* const root) noexcept -> const Derived* { return extremum(root, true); }
 
     /// In-order or reverse-in-order traversal of the tree; the visitor is invoked with a reference to each node.
-    /// Required stack depth is about 2*log2(size).
+    /// Required stack depth is less than 2*log2(size).
+    /// If the return type is non-void, then it shall be default-constructable and convertible to bool; in this case,
+    /// traversal will stop when the first true value is returned, which is propagated back to the caller; if none
+    /// of the calls returned true or the tree is empty, a default value is constructed and returned.
+    template <typename Vis, typename R = std::invoke_result_t<Vis, Derived&>>
+    static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
+        -> std::enable_if_t<!std::is_void_v<R>, R>
+    {
+        if (Node* const n = root)
+        {
+            if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOLINT qualified-auto
+            {
+                return t;
+            }
+            if (auto t = visitor(*root))  // NOLINT qualified-auto
+            {
+                return t;
+            }
+            return Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
+        }
+        return R{};
+    }
     template <typename Vis>
-    static void traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
+    static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
+        -> std::enable_if_t<std::is_void_v<std::invoke_result_t<Vis, Derived&>>>
     {
         if (Node* const n = root)
         {
@@ -273,8 +295,27 @@ protected:
             Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
         }
     }
+    template <typename Vis, typename R = std::invoke_result_t<Vis, const Derived&>>
+    static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
+        -> std::enable_if_t<!std::is_void_v<R>, R>
+    {
+        if (const Node* const n = root)
+        {
+            if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOLINT qualified-auto
+            {
+                return t;
+            }
+            if (auto t = visitor(*root))  // NOLINT qualified-auto
+            {
+                return t;
+            }
+            return Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
+        }
+        return R{};
+    }
     template <typename Vis>
-    static void traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
+    static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
+        -> std::enable_if_t<std::is_void_v<std::invoke_result_t<Vis, const Derived&>>>
     {
         if (const Node* const n = root)
         {
@@ -497,6 +538,18 @@ public:
     /// Normally these are not needed except if advanced introspection is desired.
     operator Derived*() noexcept { return root_; }              // NOLINT implicit conversion by design
     operator const Derived*() const noexcept { return root_; }  // NOLINT ditto
+
+    /// Access i-th element of the tree in linear time. Returns nullptr if the index is out of bounds.
+    auto operator[](const std::size_t index) -> Derived*
+    {
+        std::size_t i = index;
+        return traverse([&i](auto& x) { return (i-- == 0) ? &x : nullptr; });
+    }
+    auto operator[](const std::size_t index) const -> const Derived*
+    {
+        std::size_t i = index;
+        return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });
+    }
 
     /// Beware that this convenience method has LINEAR COMPLEXITY and uses recursion. Use responsibly.
     auto size() const noexcept
