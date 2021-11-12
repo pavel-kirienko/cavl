@@ -488,9 +488,14 @@ public:
     auto operator=(const Tree&) -> Tree& = delete;
 
     /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
-    Tree(Tree&& other) noexcept : root_(other.root_) { other.root_ = nullptr; }
+    Tree(Tree&& other) noexcept : root_(other.root_)
+    {
+        assert(0 == traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        other.root_ = nullptr;
+    }
     auto operator=(Tree&& other) noexcept -> Tree&
     {
+        assert(0 == traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         root_       = other.root_;
         other.root_ = nullptr;
         return *this;
@@ -510,12 +515,21 @@ public:
     template <typename Pre, typename Fac>
     auto search(const Pre& predicate, const Fac& factory) -> Derived*
     {
+        assert(0 == traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::template search<Pre, Fac>(root_, predicate, factory);
     }
 
     /// Wraps NodeType<>::remove().
-    void remove(const NodeType* const node) const noexcept { return NodeType::remove(root_, node); }
-    void remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
+    void remove(const NodeType* const node) const noexcept
+    {
+        assert(0 == traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        return NodeType::remove(root_, node);
+    }
+    void remove(NodeType* const node) noexcept
+    {
+        assert(0 == traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        return NodeType::remove(root_, node);
+    }
 
     /// Wraps NodeType<>::min/max().
     auto min() noexcept -> Derived* { return NodeType::min(*this); }
@@ -527,11 +541,13 @@ public:
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false)
     {
+        TraversalIndicatorUpdater upd(*this);
         return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false) const
     {
+        TraversalIndicatorUpdater upd(*this);
         return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
 
@@ -567,7 +583,23 @@ private:
     static_assert(!std::is_polymorphic_v<NodeType>);
     static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
 
-    Derived* root_ = nullptr;
+    class TraversalIndicatorUpdater final
+    {
+    public:
+        explicit TraversalIndicatorUpdater(const Tree& sup) : that(sup) { that.traversal_in_progress_++; }
+        ~TraversalIndicatorUpdater() { that.traversal_in_progress_--; }
+
+        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&) = delete;
+        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)      = delete;
+        auto operator=(const TraversalIndicatorUpdater&) -> TraversalIndicatorUpdater& = delete;
+        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater& = delete;
+
+    private:
+        const Tree& that;
+    };
+
+    Derived*            root_                  = nullptr;
+    mutable std::size_t traversal_in_progress_ = 0;
 };
 
 }  // namespace cavl
