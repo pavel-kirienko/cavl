@@ -266,6 +266,7 @@ protected:
     /// If the return type is non-void, then it shall be default-constructable and convertible to bool; in this case,
     /// traversal will stop when the first true value is returned, which is propagated back to the caller; if none
     /// of the calls returned true or the tree is empty, a default value is constructed and returned.
+    /// The tree shall not be modified while traversal is in progress, otherwise bad memory access will likely occur.
     template <typename Vis, typename R = std::invoke_result_t<Vis, Derived&>>
     static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
         -> std::enable_if_t<!std::is_void_v<R>, R>
@@ -488,9 +489,14 @@ public:
     auto operator=(const Tree&) -> Tree& = delete;
 
     /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
-    Tree(Tree&& other) noexcept : root_(other.root_) { other.root_ = nullptr; }
+    Tree(Tree&& other) noexcept : root_(other.root_)
+    {
+        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        other.root_ = nullptr;
+    }
     auto operator=(Tree&& other) noexcept -> Tree&
     {
+        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         root_       = other.root_;
         other.root_ = nullptr;
         return *this;
@@ -510,12 +516,21 @@ public:
     template <typename Pre, typename Fac>
     auto search(const Pre& predicate, const Fac& factory) -> Derived*
     {
+        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::template search<Pre, Fac>(root_, predicate, factory);
     }
 
     /// Wraps NodeType<>::remove().
-    void remove(const NodeType* const node) const noexcept { return NodeType::remove(root_, node); }
-    void remove(NodeType* const node) noexcept { return NodeType::remove(root_, node); }
+    void remove(const NodeType* const node) const noexcept
+    {
+        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        return NodeType::remove(root_, node);
+    }
+    void remove(NodeType* const node) noexcept
+    {
+        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        return NodeType::remove(root_, node);
+    }
 
     /// Wraps NodeType<>::min/max().
     auto min() noexcept -> Derived* { return NodeType::min(*this); }
@@ -527,11 +542,13 @@ public:
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false)
     {
+        TraversalIndicatorUpdater upd(*this);
         return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
     template <typename Vis>
     auto traverse(const Vis& visitor, const bool reverse = false) const
     {
+        TraversalIndicatorUpdater upd(*this);
         return NodeType::template traverse<Vis>(*this, visitor, reverse);
     }
 
@@ -551,7 +568,7 @@ public:
         return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });
     }
 
-    /// Beware that this convenience method has LINEAR COMPLEXITY and uses recursion. Use responsibly.
+    /// Beware that this convenience method has linear complexity and uses recursion. Use responsibly.
     auto size() const noexcept
     {
         auto i = 0UL;
@@ -567,7 +584,27 @@ private:
     static_assert(!std::is_polymorphic_v<NodeType>);
     static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
 
-    Derived* root_ = nullptr;
+    /// We use a simple boolean flag instead of a nesting counter to avoid race conditions on the counter update.
+    /// This implies that in the case of concurrent or recursive traversal (more than one call to traverse() within
+    /// the same call stack) we may occasionally fail to detect a bona fide case of a race condition, but this is
+    /// acceptable because the purpose of this feature is to provide a mere best-effort data race detection.
+    class TraversalIndicatorUpdater final
+    {
+    public:
+        explicit TraversalIndicatorUpdater(const Tree& sup) noexcept : that(sup) { that.traversal_in_progress_ = true; }
+        ~TraversalIndicatorUpdater() noexcept { that.traversal_in_progress_ = false; }
+
+        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&) = delete;
+        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)      = delete;
+        auto operator=(const TraversalIndicatorUpdater&) -> TraversalIndicatorUpdater& = delete;
+        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater& = delete;
+
+    private:
+        const Tree& that;
+    };
+
+    Derived*              root_                  = nullptr;
+    mutable volatile bool traversal_in_progress_ = false;
 };
 
 }  // namespace cavl
