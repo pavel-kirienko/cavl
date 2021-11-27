@@ -24,9 +24,19 @@
 
 #pragma once
 
-#include <cassert>
 #include <cstdint>
 #include <type_traits>
+
+/// If CAVL is used in throughput-critical code, then it is recommended to disable assertion checks as they may
+/// be costly in terms of execution time.
+#ifndef CAVL_ASSERT
+#    if defined(CAVL_NO_ASSERT) && CAVL_NO_ASSERT
+#        define CAVL_ASSERT(x) (void) 0
+#    else
+#        include <cassert>  // NOLINTNEXTLINE function-like macro
+#        define CAVL_ASSERT(x) assert(x)
+#    endif
+#endif
 
 namespace cavl
 {
@@ -76,7 +86,7 @@ protected:
     {
         Derived*       p   = down(root);
         Derived* const out = search<Pre>(p, predicate, []() -> Derived* { return nullptr; });
-        assert(p == root);
+        CAVL_ASSERT(p == root);
         return out;
     }
 
@@ -195,7 +205,7 @@ protected:
 private:
     void rotate(const bool r) noexcept
     {
-        assert((lr[!r] != nullptr) && ((bf >= -1) && (bf <= +1)));
+        CAVL_ASSERT((lr[!r] != nullptr) && ((bf >= -1) && (bf <= +1)));
         Node* const z = lr[!r];
         if (up != nullptr)
         {
@@ -277,7 +287,7 @@ auto Node<Derived>::search(Derived*& root, const Pre& predicate, const Fac& fact
         r  = cmp > 0;
         up = n;
         n  = n->lr[r];
-        assert((nullptr == n) || (n->up == up));
+        CAVL_ASSERT((nullptr == n) || (n->up == up));
     }
     if (nullptr == out)
     {
@@ -286,7 +296,7 @@ auto Node<Derived>::search(Derived*& root, const Pre& predicate, const Fac& fact
         {
             if (up != nullptr)
             {
-                assert(up->lr[r] == nullptr);
+                CAVL_ASSERT(up->lr[r] == nullptr);
                 up->lr[r] = out;
             }
             else
@@ -309,8 +319,8 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
 {
     if (node != nullptr)
     {
-        assert(root != nullptr);  // Otherwise, the node would have to be nullptr.
-        assert((node->up != nullptr) || (node == root));
+        CAVL_ASSERT(root != nullptr);  // Otherwise, the node would have to be nullptr.
+        CAVL_ASSERT((node->up != nullptr) || (node == root));
         Node* p = nullptr;  // The lowest parent node that suffered a shortening of its subtree.
         bool  r = false;    // Which side of the above was shortened.
         // The first step is to update the topology and remember the node where to start the retracing from later.
@@ -318,14 +328,14 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
         if ((node->lr[0] != nullptr) && (node->lr[1] != nullptr))
         {
             Node* const re = min(node->lr[1]);
-            assert((re != nullptr) && (nullptr == re->lr[0]) && (re->up != nullptr));
+            CAVL_ASSERT((re != nullptr) && (nullptr == re->lr[0]) && (re->up != nullptr));
             re->bf        = node->bf;
             re->lr[0]     = node->lr[0];
             re->lr[0]->up = re;
             if (re->up != node)
             {
                 p = re->up;  // Retracing starts with the ex-parent of our replacement node.
-                assert(p->lr[0] == re);
+                CAVL_ASSERT(p->lr[0] == re);
                 p->lr[0] = re->lr[1];  // Reducing the height of the left subtree here.
                 if (p->lr[0] != nullptr)
                 {
@@ -392,7 +402,7 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
             }
             if (nullptr == p)
             {
-                assert(c != nullptr);
+                CAVL_ASSERT(c != nullptr);
                 root = down(c);
             }
         }
@@ -402,7 +412,7 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
 template <typename Derived>
 auto Node<Derived>::adjustBalance(const bool increment) noexcept -> Node*
 {
-    assert(((bf >= -1) && (bf <= +1)));
+    CAVL_ASSERT(((bf >= -1) && (bf <= +1)));
     Node*      out    = this;
     const auto new_bf = static_cast<std::int8_t>(bf + (increment ? +1 : -1));
     if ((new_bf < -1) || (new_bf > 1))
@@ -410,8 +420,8 @@ auto Node<Derived>::adjustBalance(const bool increment) noexcept -> Node*
         const bool   r    = new_bf < 0;   // bf<0 if left-heavy --> right rotation is needed.
         const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
         Node* const  z    = lr[!r];
-        assert(z != nullptr);     // Heavy side cannot be empty.
-        if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
+        CAVL_ASSERT(z != nullptr);  // Heavy side cannot be empty.
+        if ((z->bf * sign) <= 0)    // Parent and child are heavy on the same side or the child is balanced.
         {
             out = z;
             rotate(r);
@@ -429,7 +439,7 @@ auto Node<Derived>::adjustBalance(const bool increment) noexcept -> Node*
         else  // Otherwise, the child needs to be rotated in the opposite direction first.
         {
             Node* const y = z->lr[r];
-            assert(y != nullptr);  // Heavy side cannot be empty.
+            CAVL_ASSERT(y != nullptr);  // Heavy side cannot be empty.
             out = y;
             z->rotate(!r);
             rotate(r);
@@ -462,13 +472,13 @@ auto Node<Derived>::adjustBalance(const bool increment) noexcept -> Node*
 template <typename Derived>
 auto Node<Derived>::retraceOnGrowth() noexcept -> Node*
 {
-    assert(0 == bf);
+    CAVL_ASSERT(0 == bf);
     Node* c = this;      // Child
     Node* p = this->up;  // Parent
     while (p != nullptr)
     {
         const bool r = p->lr[1] == c;  // c is the right child of parent
-        assert(p->lr[r] == c);
+        CAVL_ASSERT(p->lr[r] == c);
         c = p->adjustBalance(r);
         p = c->up;
         if (0 == c->bf)
@@ -476,7 +486,7 @@ auto Node<Derived>::retraceOnGrowth() noexcept -> Node*
             break;  // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
         }
     }
-    assert(c != nullptr);
+    CAVL_ASSERT(c != nullptr);
     return (nullptr == p) ? c : nullptr;  // New root or nothing.
 }
 
@@ -504,12 +514,12 @@ public:
     /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
     Tree(Tree&& other) noexcept : root_(other.root_)
     {
-        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         other.root_ = nullptr;
     }
     auto operator=(Tree&& other) noexcept -> Tree&
     {
-        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         root_       = other.root_;
         other.root_ = nullptr;
         return *this;
@@ -529,19 +539,19 @@ public:
     template <typename Pre, typename Fac>
     auto search(const Pre& predicate, const Fac& factory) -> Derived*
     {
-        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::template search<Pre, Fac>(root_, predicate, factory);
     }
 
     /// Wraps NodeType<>::remove().
     void remove(const NodeType* const node) const noexcept
     {
-        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::remove(root_, node);
     }
     void remove(NodeType* const node) noexcept
     {
-        assert(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
+        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::remove(root_, node);
     }
 
