@@ -847,8 +847,8 @@ void testRemovalA()
     //  1   3       7
     std::puts("REMOVE 4:");
     remove(&root, &t[4]);
-    TEST_ASSERT_EQUAL(&t[5], root);
     print(root);
+    TEST_ASSERT_EQUAL(&t[5], root);
     TEST_ASSERT_NULL(findBrokenBalanceFactor(root));
     TEST_ASSERT_NULL(findBrokenAncestry(root));
     TEST_ASSERT_EQUAL(6, checkAscension(root));
