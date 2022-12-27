@@ -12,6 +12,8 @@
 #include <sstream>
 #include <memory>
 #include <numeric>
+#include <vector>
+#include <functional>
 
 void setUp() {}
 
@@ -199,7 +201,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TreeType tr;
     TEST_ASSERT(tr.empty());
     const auto insert = [&](const std::uint8_t i) {
-        std::cout << "Inserting " << int(i) << std::endl;
+        std::cout << "Inserting " << static_cast<int>(i) << std::endl;
         const auto pred = [&](const N& v) { return t.at(i)->getValue() - v.getValue(); };
         TEST_ASSERT_NULL(tr.search(pred));
         TEST_ASSERT_NULL(static_cast<const TreeType&>(tr).search(pred));
@@ -789,12 +791,12 @@ public:
     using Self::min;
     using Self::max;
 
-    V()          = default;
-    virtual ~V() = default;
-    V(const V&)  = delete;
-    V(V&&)       = delete;
+    V()                    = default;
+    virtual ~V()           = default;
+    V(const V&)            = delete;
+    V(V&&)                 = delete;
     V& operator=(const V&) = delete;
-    V& operator=(V&&) = delete;
+    V& operator=(V&&)      = delete;
 
     [[nodiscard]] virtual auto getValue() const -> std::uint16_t = 0;
 

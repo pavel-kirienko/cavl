@@ -10,16 +10,16 @@ jobs:
         toolchain: ['clang', 'gcc']
         include:
           - toolchain: gcc
-            c-compiler: gcc
-            cxx-compiler: g++
+            c-compiler: gcc-12
+            cxx-compiler: g++-12
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Dependencies
-        run: sudo apt install gcc-multilib g++-multilib clang-tidy-12
+        run: sudo apt install gcc-multilib g++-multilib clang-tidy-14
 
       - name: Configure CMake
         run: >
@@ -36,7 +36,7 @@ jobs:
 
       - name: Test
         working-directory: ${{github.workspace}}/build
-        run: make test
+        run: make test ARGS="--verbose"
 
   optimizations:
     runs-on: ubuntu-latest
@@ -46,13 +46,13 @@ jobs:
         build_type: [Release, MinSizeRel]
         include:
           - toolchain: gcc
-            c-compiler: gcc
-            cxx-compiler: g++
+            c-compiler: gcc-12
+            cxx-compiler: g++-12
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Dependencies
         run: sudo apt install gcc-multilib g++-multilib
@@ -73,15 +73,15 @@ jobs:
 
       - name: Test
         working-directory: ${{github.workspace}}/build
-        run: make test
+        run: make test ARGS="--verbose"
 
   style_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: DoozyX/clang-format-lint-action@v0.12
+      - uses: actions/checkout@v3
+      - uses: DoozyX/clang-format-lint-action@v0.14
         with:
           source: '.'
           exclude: './unity'
           extensions: 'c,h,cpp,hpp'
-          clangFormatVersion: 12
+          clangFormatVersion: 14

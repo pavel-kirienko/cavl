@@ -139,7 +139,7 @@ static inline Cavl* cavlPrivateAdjustBalance(Cavl* const x, const bool increment
         const bool   r    = new_bf < 0;   // bf<0 if left-heavy --> right rotation is needed.
         const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
         Cavl* const  z    = x->lr[!r];
-        CAVL_ASSERT(z != NULL);   // Heavy side cannot be empty.
+        CAVL_ASSERT(z != NULL);   // Heavy side cannot be empty.  NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         if ((z->bf * sign) <= 0)  // Parent and child are heavy on the same side or the child is balanced.
         {
             out = z;

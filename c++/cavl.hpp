@@ -57,13 +57,13 @@ public:
     using DerivedType = Derived;
 
     // Tree nodes cannot be copied for obvious reasons.
-    Node(const Node&) = delete;
+    Node(const Node&)                    = delete;
     auto operator=(const Node&) -> Node& = delete;
 
     // They can't be moved either, but the reason is less obvious.
     // While we can trivially update the pointers in the adjacent nodes to keep the tree valid,
     // we can't update external references to the tree. This breaks the tree if one attempted to move its root node.
-    Node(Node&& other) = delete;
+    Node(Node&& other)                    = delete;
     auto operator=(Node&& other) -> Node& = delete;
 
 protected:
@@ -420,7 +420,7 @@ auto Node<Derived>::adjustBalance(const bool increment) noexcept -> Node*
         const bool   r    = new_bf < 0;   // bf<0 if left-heavy --> right rotation is needed.
         const int8_t sign = r ? +1 : -1;  // Positive if we are rotating right.
         Node* const  z    = lr[!r];
-        CAVL_ASSERT(z != nullptr);  // Heavy side cannot be empty.
+        CAVL_ASSERT(z != nullptr);  // Heavy side cannot be empty. NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         if ((z->bf * sign) <= 0)    // Parent and child are heavy on the same side or the child is balanced.
         {
             out = z;
@@ -508,7 +508,7 @@ public:
     ~Tree() = default;
 
     /// Trees cannot be copied.
-    Tree(const Tree&) = delete;
+    Tree(const Tree&)                    = delete;
     auto operator=(const Tree&) -> Tree& = delete;
 
     /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
@@ -603,7 +603,6 @@ public:
     auto empty() const noexcept { return root_ == nullptr; }
 
 private:
-    static_assert(std::is_base_of_v<NodeType, Derived>, "Invalid usage: CRTP inheritance required");
     static_assert(!std::is_polymorphic_v<NodeType>);
     static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
 
@@ -617,10 +616,10 @@ private:
         explicit TraversalIndicatorUpdater(const Tree& sup) noexcept : that(sup) { that.traversal_in_progress_ = true; }
         ~TraversalIndicatorUpdater() noexcept { that.traversal_in_progress_ = false; }
 
-        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&) = delete;
-        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)      = delete;
+        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&)                    = delete;
+        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)                         = delete;
         auto operator=(const TraversalIndicatorUpdater&) -> TraversalIndicatorUpdater& = delete;
-        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater& = delete;
+        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater&      = delete;
 
     private:
         const Tree& that;
