@@ -16,7 +16,7 @@ jobs:
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Dependencies
         run: sudo apt install gcc-multilib g++-multilib clang-tidy-12
@@ -52,7 +52,7 @@ jobs:
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Dependencies
         run: sudo apt install gcc-multilib g++-multilib
@@ -78,7 +78,7 @@ jobs:
   style_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: DoozyX/clang-format-lint-action@v0.12
         with:
           source: '.'
