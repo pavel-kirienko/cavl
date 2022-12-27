@@ -10,8 +10,8 @@ jobs:
         toolchain: ['clang', 'gcc']
         include:
           - toolchain: gcc
-            c-compiler: gcc
-            cxx-compiler: g++
+            c-compiler: gcc-12
+            cxx-compiler: g++-12
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
@@ -46,8 +46,8 @@ jobs:
         build_type: [Release, MinSizeRel]
         include:
           - toolchain: gcc
-            c-compiler: gcc
-            cxx-compiler: g++
+            c-compiler: gcc-12
+            cxx-compiler: g++-12
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
