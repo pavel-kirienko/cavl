@@ -57,13 +57,13 @@ public:
     using DerivedType = Derived;
 
     // Tree nodes cannot be copied for obvious reasons.
-    Node(const Node&) = delete;
+    Node(const Node&)                    = delete;
     auto operator=(const Node&) -> Node& = delete;
 
     // They can't be moved either, but the reason is less obvious.
     // While we can trivially update the pointers in the adjacent nodes to keep the tree valid,
     // we can't update external references to the tree. This breaks the tree if one attempted to move its root node.
-    Node(Node&& other) = delete;
+    Node(Node&& other)                    = delete;
     auto operator=(Node&& other) -> Node& = delete;
 
 protected:
@@ -508,7 +508,7 @@ public:
     ~Tree() = default;
 
     /// Trees cannot be copied.
-    Tree(const Tree&) = delete;
+    Tree(const Tree&)                    = delete;
     auto operator=(const Tree&) -> Tree& = delete;
 
     /// Trees can be easily moved in constant time. This does not actually affect the tree itself, only this object.
@@ -616,10 +616,10 @@ private:
         explicit TraversalIndicatorUpdater(const Tree& sup) noexcept : that(sup) { that.traversal_in_progress_ = true; }
         ~TraversalIndicatorUpdater() noexcept { that.traversal_in_progress_ = false; }
 
-        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&) = delete;
-        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)      = delete;
+        TraversalIndicatorUpdater(const TraversalIndicatorUpdater&)                    = delete;
+        TraversalIndicatorUpdater(TraversalIndicatorUpdater&&)                         = delete;
         auto operator=(const TraversalIndicatorUpdater&) -> TraversalIndicatorUpdater& = delete;
-        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater& = delete;
+        auto operator=(TraversalIndicatorUpdater&&) -> TraversalIndicatorUpdater&      = delete;
 
     private:
         const Tree& that;

@@ -36,7 +36,7 @@ jobs:
 
       - name: Test
         working-directory: ${{github.workspace}}/build
-        run: make test
+        run: make test ARGS="--verbose"
 
   optimizations:
     runs-on: ubuntu-latest
@@ -73,15 +73,15 @@ jobs:
 
       - name: Test
         working-directory: ${{github.workspace}}/build
-        run: make test
+        run: make test ARGS="--verbose"
 
   style_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: DoozyX/clang-format-lint-action@v0.12
+      - uses: DoozyX/clang-format-lint-action@v0.14
         with:
           source: '.'
           exclude: './unity'
           extensions: 'c,h,cpp,hpp'
-          clangFormatVersion: 12
+          clangFormatVersion: 14

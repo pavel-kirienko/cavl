@@ -10,7 +10,7 @@ set(CTEST_OUTPUT_ON_FAILURE ON)
 
 # Use -DNO_STATIC_ANALYSIS=1 to suppress static analysis. If not suppressed, the tools used here shall be available.
 if (NOT NO_STATIC_ANALYSIS)
-    find_program(clang_tidy NAMES clang-tidy-12 clang-tidy)
+    find_program(clang_tidy NAMES clang-tidy-14 clang-tidy)
     if (NOT clang_tidy)
         message(FATAL_ERROR "Could not locate clang-tidy")
     endif ()
@@ -18,11 +18,15 @@ if (NOT NO_STATIC_ANALYSIS)
     set(CMAKE_CXX_CLANG_TIDY ${clang_tidy})
 endif ()
 
-find_program(clang_format NAMES clang-format-12 clang-format)
+find_program(clang_format NAMES clang-format-14 clang-format)
 if (NOT clang_format)
     message(STATUS "Could not locate clang-format")
 else ()
-    file(GLOB format_files ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch] ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch]pp)
+    file(GLOB format_files
+         ${CMAKE_CURRENT_SOURCE_DIR}/c/*.[ch]pp
+         ${CMAKE_CURRENT_SOURCE_DIR}/c/*.[ch]
+         ${CMAKE_CURRENT_SOURCE_DIR}/c++/*.[ch]pp
+    )
     message(STATUS "Using clang-format: ${clang_format}; files: ${format_files}")
     add_custom_target(format COMMAND ${clang_format} -i -fallback-style=none -style=file --verbose ${format_files})
 endif ()

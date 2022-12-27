@@ -98,8 +98,8 @@ void remove(Node<T>** const root, const Node<T>* const n)
 template <typename T>
 std::uint8_t getHeight(const Node<T>* const n)
 {
-    return (n != nullptr) ? std::uint8_t(1U + std::max(getHeight(reinterpret_cast<Node<T>*>(n->lr[0])),
-                                                       getHeight(reinterpret_cast<Node<T>*>(n->lr[1]))))
+    return (n != nullptr) ? static_cast<std::uint8_t>(1U + std::max(getHeight(reinterpret_cast<Node<T>*>(n->lr[0])),
+                                                                    getHeight(reinterpret_cast<Node<T>*>(n->lr[1]))))
                           : 0;
 }
 
@@ -154,17 +154,21 @@ void printGraphviz(const Node<T>* const nd)
     std::puts("nodesep=0.0;ranksep=0.3;splines=false;");
     traverse<true>(nd, [](const Node<T>* const x) {
         const char* const fill_color = (x->bf == 0) ? "black" : ((x->bf > 0) ? "orange" : "blue");
-        std::printf("%u[fillcolor=%s];", unsigned(x->value), fill_color);
+        std::printf("%u[fillcolor=%s];", static_cast<unsigned>(x->value), fill_color);
     });
     std::puts("");
     traverse<true>(nd, [](const Node<T>* const x) {
         if (x->lr[0] != nullptr)
         {
-            std::printf("%u:sw->%u:n;", unsigned(x->value), unsigned(reinterpret_cast<Node<T>*>(x->lr[0])->value));
+            std::printf("%u:sw->%u:n;",
+                        static_cast<unsigned>(x->value),
+                        static_cast<unsigned>(reinterpret_cast<Node<T>*>(x->lr[0])->value));
         }
         if (x->lr[1] != nullptr)
         {
-            std::printf("%u:se->%u:n;", unsigned(x->value), unsigned(reinterpret_cast<Node<T>*>(x->lr[1])->value));
+            std::printf("%u:se->%u:n;",
+                        static_cast<unsigned>(x->value),
+                        static_cast<unsigned>(reinterpret_cast<Node<T>*>(x->lr[1])->value));
         }
     });
     std::puts("\n}");
@@ -1385,12 +1389,14 @@ void testMutationRandomized()
     }
 
     std::puts("Randomized test finished. Final state:");
-    std::printf("\tsize:         %u\n", unsigned(size));
-    std::printf("\tcnt_addition: %u\n", unsigned(cnt_addition));
-    std::printf("\tcnt_removal:  %u\n", unsigned(cnt_removal));
+    std::printf("\tsize:         %u\n", static_cast<unsigned>(size));
+    std::printf("\tcnt_addition: %u\n", static_cast<unsigned>(cnt_addition));
+    std::printf("\tcnt_removal:  %u\n", static_cast<unsigned>(cnt_removal));
     if (root != nullptr)
     {
-        std::printf("\tmin/max:      %u/%u\n", unsigned(root->min()->value), unsigned(root->max()->value));
+        std::printf("\tmin/max:      %u/%u\n",
+                    static_cast<unsigned>(root->min()->value),
+                    static_cast<unsigned>(root->max()->value));
     }
     printGraphviz(root);
     validate();
