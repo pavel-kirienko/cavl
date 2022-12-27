@@ -12,6 +12,7 @@
 #include <sstream>
 #include <memory>
 #include <numeric>
+#include <vector>
 
 void setUp() {}
 
