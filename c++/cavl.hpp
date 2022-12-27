@@ -603,7 +603,6 @@ public:
     auto empty() const noexcept { return root_ == nullptr; }
 
 private:
-    static_assert(std::is_base_of_v<NodeType, Derived>, "Invalid usage: CRTP inheritance required");
     static_assert(!std::is_polymorphic_v<NodeType>);
     static_assert(std::is_same_v<Tree<Derived>, typename NodeType::TreeType>);
 
