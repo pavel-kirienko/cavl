@@ -47,6 +47,13 @@ target_include_directories(unity SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/unity
 target_compile_definitions(unity PUBLIC -DUNITY_SHORTHAND_AS_RAW=1 -DUNITY_OUTPUT_COLOR=1)
 
 add_executable(test_c ${CMAKE_CURRENT_SOURCE_DIR}/c/test.cpp)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC miscompiles the test with optimizations enabled with the strict aliasing enabled
+    # due to the reinterpret_cast<> in a test helper. This should be fixed one day.
+    # This deficiency of the test suite is not expected to affect applications.
+    # This workaround is also not required for clang.
+    target_compile_options(test_c PRIVATE -fno-strict-aliasing)
+endif()
 target_link_libraries(test_c unity)
 add_test("run_test_c" "test_c")
 
