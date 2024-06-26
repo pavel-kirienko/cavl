@@ -22,8 +22,13 @@
 #    define NODISCARD [[nodiscard]]
 #    define UNUSED [[maybe_unused]]
 #else
-#    define NODISCARD
-#    define UNUSED
+#    if defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)
+#        define NODISCARD __attribute__((warn_unused_result))
+#        define UNUSED __attribute__((unused))
+#    else
+#        define NODISCARD
+#        define UNUSED
+#    endif
 #endif
 
 void setUp() {}
@@ -60,9 +65,9 @@ private:
     // defined in the derived class. That would trigger compilation error in this case, but may be deadly in the field.
     using E = struct
     {};
-    UNUSED E up;  // NOLINT(*-unused-private-field)
-    UNUSED E lr;  // NOLINT(*-unused-private-field)
-    UNUSED E bf;  // NOLINT(*-unused-private-field)
+    UNUSED E up;
+    UNUSED E lr;
+    UNUSED E bf;
 };
 using MyTree = cavl::Tree<My>;
 static_assert(std::is_same<My::TreeType, MyTree>::value, "");
@@ -815,9 +820,9 @@ public:
 private:
     using E = struct
     {};
-    UNUSED E up;  // NOLINT(*-unused-private-field)
-    UNUSED E lr;  // NOLINT(*-unused-private-field)
-    UNUSED E bf;  // NOLINT(*-unused-private-field)
+    UNUSED E up;
+    UNUSED E lr;
+    UNUSED E bf;
 };
 using VTree = cavl::Tree<V>;
 static_assert(std::is_same<V::TreeType, VTree>::value, "");
