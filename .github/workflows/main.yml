@@ -10,16 +10,19 @@ jobs:
         toolchain: ['clang', 'gcc']
         include:
           - toolchain: gcc
-            c-compiler: gcc-12
-            cxx-compiler: g++-12
+            c-compiler: gcc
+            cxx-compiler: g++
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Dependencies
-        run: sudo apt install gcc-multilib g++-multilib clang-tidy-14
+        run: |
+          sudo apt install gcc-multilib g++-multilib clang-tidy
+          g++ --version
+          clang-tidy --version
 
       - name: Configure CMake
         run: >
@@ -46,13 +49,13 @@ jobs:
         build_type: [Release, MinSizeRel]
         include:
           - toolchain: gcc
-            c-compiler: gcc-12
-            cxx-compiler: g++-12
+            c-compiler: gcc
+            cxx-compiler: g++
           - toolchain: clang
             c-compiler: clang
             cxx-compiler: clang++
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: sudo apt install gcc-multilib g++-multilib
@@ -78,10 +81,10 @@ jobs:
   style_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: DoozyX/clang-format-lint-action@v0.14
+      - uses: actions/checkout@v4
+      - uses: DoozyX/clang-format-lint-action@v0.17
         with:
           source: '.'
           exclude: './unity'
           extensions: 'c,h,cpp,hpp'
-          clangFormatVersion: 14
+          clangFormatVersion: 17

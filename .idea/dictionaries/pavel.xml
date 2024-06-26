@@ -8,6 +8,8 @@
       <w>miscompiles</w>
       <w>nihil</w>
       <w>nodesep</w>
+      <w>nolintbegin</w>
+      <w>nolintend</w>
       <w>noninfringement</w>
       <w>penwidth</w>
       <w>ranksep</w>
