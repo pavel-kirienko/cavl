@@ -153,9 +153,8 @@ protected:
     /// of the calls returned true or the tree is empty, a default value is constructed and returned.
     /// The tree shall not be modified while traversal is in progress, otherwise bad memory access will likely occur.
     template <typename Vis, typename R = invoke_result<Vis, Derived&>>
-    static auto traverse(Derived* const root,
-                         const Vis&     visitor,
-                         const bool     reverse = false) -> std::enable_if_t<!std::is_void<R>::value, R>
+    static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)  //
+        -> std::enable_if_t<!std::is_void<R>::value, R>
     {
         if (Node* const n = root)
         {
@@ -183,9 +182,8 @@ protected:
         }
     }
     template <typename Vis, typename R = invoke_result<Vis, const Derived&>>
-    static auto traverse(const Derived* const root,
-                         const Vis&           visitor,
-                         const bool           reverse = false) -> std::enable_if_t<!std::is_void<R>::value, R>
+    static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
+        -> std::enable_if_t<!std::is_void<R>::value, R>
     {
         if (const Node* const n = root)
         {
