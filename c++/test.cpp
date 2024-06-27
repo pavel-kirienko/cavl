@@ -1,22 +1,22 @@
 /// Copyright (c) 2021 Pavel Kirienko <pavel@uavcan.org>
 
 #include "cavl.hpp"
-#include <unity.h>
+
 #include <algorithm>
 #include <array>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
-#include <ctime>
-#include <string>
+#include <functional>
 #include <iostream>
-#include <sstream>
+#include <limits>
 #include <memory>
 #include <numeric>
-#include <limits>
-#include <vector>
+#include <sstream>
+#include <string>
 #include <type_traits>
-#include <functional>
+#include <unity.h>
+#include <vector>
 
 #if __cplusplus >= 201703L
 #    define NODISCARD [[nodiscard]]
@@ -679,6 +679,19 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(4), static_cast<N*>(tr3));  // Moved.
     TEST_ASSERT_NULL(static_cast<N*>(tr2));            // NOLINT use after move is intentional.
     TEST_ASSERT_EQUAL(1, tr3.size());
+
+    // Try various methods on empty tree (including `const` one).
+    //
+    std::puts("REMOVE 4");
+    tr3.remove(t[4]);
+    tr3.remove(nullptr);
+    TEST_ASSERT_EQUAL(nullptr, tr3.min());
+    TEST_ASSERT_EQUAL(nullptr, tr3.max());
+    const TreeType tr4_const{std::move(tr3)};
+    TEST_ASSERT_EQUAL(0, tr4_const.size());
+    TEST_ASSERT_EQUAL(nullptr, tr4_const.min());
+    TEST_ASSERT_EQUAL(nullptr, tr4_const.max());
+    TEST_ASSERT_EQUAL(0, tr4_const.traverse([](const N&) { return 13; }));
 
     // Clean up manually to reduce boilerplate in the tests. This is super sloppy but OK for a basic test suite.
     for (auto* const x : t)

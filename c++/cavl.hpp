@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <tuple>
 #include <type_traits>
@@ -32,12 +34,16 @@
 /// be costly in terms of execution time.
 #ifndef CAVL_ASSERT
 #    if defined(CAVL_NO_ASSERT) && CAVL_NO_ASSERT
-#        define CAVL_ASSERT(x) (void) 0
+#                                       // NOLINTNEXTLINE(cppcoreguidelines-macro-usage) function-like macro
+#        define CAVL_ASSERT(x) (void) 0 /* NOSONAR cpp:S960 */
 #    else
-#        include <cassert>  // NOLINTNEXTLINE function-like macro
-#        define CAVL_ASSERT(x) assert(x)
+#        include <cassert>
+#                                        // NOLINTNEXTLINE(cppcoreguidelines-macro-usage) function-like macro
+#        define CAVL_ASSERT(x) assert(x) /* NOSONAR cpp:S960 */
 #    endif
 #endif
+
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 
 namespace cavl
 {
@@ -133,13 +139,20 @@ protected:
     /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
     /// It is safe to pass the result of search() directly as the second argument:
     ///     Node<T>::remove(root, Node<T>::search(root, search_predicate));
-    static void remove(Derived*& root, const Node* const node) noexcept;
+    ///
+    /// No Sonar cpp:S6936 b/c the `remove` method name isolated inside `Node` type (doesn't conflict with C).
+    static void remove(Derived*& root, const Node* const node) noexcept;  // NOSONAR cpp:S6936
 
     /// This is like the const overload of remove() except that the node pointers are invalidated afterward for safety.
-    static void remove(Derived*& root, Node* const node) noexcept
+    ///
+    /// No Sonar cpp:S6936 b/c the `remove` method name isolated inside `Node` type (doesn't conflict with C).
+    static void remove(Derived*& root, Node* const node) noexcept  // NOSONAR cpp:S6936
     {
         remove(root, static_cast<const Node*>(node));
-        node->unlink();
+        if (nullptr != node)
+        {
+            node->unlink();
+        }
     }
 
     /// These methods provide very fast retrieval of min/max values, either const or mutable.
@@ -275,9 +288,9 @@ private:
     friend class Tree<Derived>;
 
     // The binary layout is compatible with the C version.
-    Node*       up = nullptr;
-    Node*       lr[2]{};
-    std::int8_t bf = 0;
+    Node*                up = nullptr;
+    std::array<Node*, 2> lr{};
+    std::int8_t          bf = 0;
 };
 
 template <typename Derived>
@@ -330,8 +343,10 @@ auto Node<Derived>::search(Derived*& root, const Pre& predicate, const Fac& fact
     return std::make_tuple(down(out), false);
 }
 
+// No Sonar cpp:S6936 b/c the `remove` method name isolated inside `Node` type (doesn't conflict with C).
+// No Sonar cpp:S3776 cpp:S134 cpp:S5311 b/c this is the main removal tool - maintainability is not a concern here.
 template <typename Derived>
-void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
+void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept  // NOSONAR cpp:S6936 cpp:S3776
 {
     if (node != nullptr)
     {
@@ -340,7 +355,7 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
         Node* p = nullptr;  // The lowest parent node that suffered a shortening of its subtree.
         bool  r = false;    // Which side of the above was shortened.
         // The first step is to update the topology and remember the node where to start the retracing from later.
-        // Balancing is not performed yet so we may end up with an unbalanced tree.
+        // Balancing is not performed yet, so we may end up with an unbalanced tree.
         if ((node->lr[0] != nullptr) && (node->lr[1] != nullptr))
         {
             Node* const re = min(node->lr[1]);
@@ -352,8 +367,8 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
             {
                 p = re->up;  // Retracing starts with the ex-parent of our replacement node.
                 CAVL_ASSERT(p->lr[0] == re);
-                p->lr[0] = re->lr[1];  // Reducing the height of the left subtree here.
-                if (p->lr[0] != nullptr)
+                p->lr[0] = re->lr[1];     // Reducing the height of the left subtree here.
+                if (p->lr[0] != nullptr)  // NOSONAR cpp:S134
                 {
                     p->lr[0]->up = p;
                 }
@@ -364,8 +379,7 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
             else  // In this case, we are reducing the height of the right subtree, so r=1.
             {
                 p = re;    // Retracing starts with the replacement node itself as we are deleting its parent.
-                r = true;  // The right child of the replacement node remains the same so we don't bother relinking
-                // it.
+                r = true;  // The right child of the replacement node remains the same, so we don't bother relinking it.
             }
             re->up = node->up;
             if (re->up != nullptr)
@@ -389,7 +403,7 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
             {
                 r        = p->lr[1] == node;
                 p->lr[r] = node->lr[rr];
-                if (p->lr[r] != nullptr)
+                if (p->lr[r] != nullptr)  // NOSONAR cpp:S134
                 {
                     p->lr[r]->up = p;
                 }
@@ -406,12 +420,13 @@ void Node<Derived>::remove(Derived*& root, const Node* const node) noexcept
         if (p != nullptr)
         {
             Node* c = nullptr;
-            for (;;)
+            for (;;)  // NOSONAR cpp:S5311
             {
                 c = p->adjustBalance(!r);
                 p = c->up;
-                if ((c->bf != 0) || (nullptr == p))  // Reached the root or the height difference is absorbed by c.
+                if ((c->bf != 0) || (nullptr == p))  // NOSONAR cpp:S134
                 {
+                    // Reached the root or the height difference is absorbed by `c`.
                     break;
                 }
                 r = p->lr[1] == c;
@@ -511,8 +526,11 @@ auto Node<Derived>::retraceOnGrowth() noexcept -> Node*
 /// defined in the Node<> template class, such that the node pointer kept in the instance of this class is passed
 /// as the first argument of the static methods of Node<>.
 /// Note that this type is implicitly convertible to Node<>* as the root node.
+///
+/// No Sonar cpp:S3624 b/c it's by design that ~Tree destructor is default one - resource management (allocation
+/// and de-allocation of nodes) is client responsibility.
 template <typename Derived>
-class Tree final
+class Tree final  // NOSONAR cpp:S3624
 {
 public:
     /// Helper alias of the compatible node type.
@@ -560,12 +578,9 @@ public:
     }
 
     /// Wraps NodeType<>::remove().
-    void remove(const NodeType* const node) const noexcept
-    {
-        CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
-        return NodeType::remove(root_, node);
-    }
-    void remove(NodeType* const node) noexcept
+    ///
+    /// No Sonar cpp:S6936 b/c the `remove` method name isolated inside `Tree` type (doesn't conflict with C).
+    void remove(NodeType* const node) noexcept  // NOSONAR cpp:S6936
     {
         CAVL_ASSERT(!traversal_in_progress_);  // Cannot modify the tree while it is being traversed.
         return NodeType::remove(root_, node);
@@ -592,19 +607,31 @@ public:
     }
 
     /// Normally these are not needed except if advanced introspection is desired.
-    operator Derived*() noexcept { return root_; }              // NOLINT implicit conversion by design
-    operator const Derived*() const noexcept { return root_; }  // NOLINT ditto
+    ///
+    /// No linting and Sonar cpp:S1709 b/c implicit conversion by design.
+    // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
+    operator Derived*() noexcept  // NOSONAR cpp:S1709
+    {
+        return root_;
+    }
+    // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
+    operator const Derived*() const noexcept  // NOSONAR cpp:S1709
+    {
+        return root_;
+    }
 
     /// Access i-th element of the tree in linear time. Returns nullptr if the index is out of bounds.
     auto operator[](const std::size_t index) -> Derived*
     {
         std::size_t i = index;
-        return traverse([&i](auto& x) { return (i-- == 0) ? &x : nullptr; });
+        // No Sonar cpp:S881 b/c this decrement is pretty much straightforward - no maintenance concerns.
+        return traverse([&i](auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
     }
     auto operator[](const std::size_t index) const -> const Derived*
     {
         std::size_t i = index;
-        return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });
+        // No Sonar cpp:S881 b/c this decrement is pretty much straightforward - no maintenance concerns.
+        return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
     }
 
     /// Beware that this convenience method has linear complexity and uses recursion. Use responsibly.
@@ -627,7 +654,9 @@ private:
     /// This implies that in the case of concurrent or recursive traversal (more than one call to traverse() within
     /// the same call stack) we may occasionally fail to detect a bona fide case of a race condition, but this is
     /// acceptable because the purpose of this feature is to provide a mere best-effort data race detection.
-    class TraversalIndicatorUpdater final
+    ///
+    /// No Sonar cpp:S4963 b/c of the RAII pattern.
+    class TraversalIndicatorUpdater final  // NOSONAR cpp:S4963
     {
     public:
         explicit TraversalIndicatorUpdater(const Tree& sup) noexcept : that(sup) { that.traversal_in_progress_ = true; }
@@ -642,8 +671,12 @@ private:
         const Tree& that;
     };
 
-    Derived*              root_                  = nullptr;
-    mutable volatile bool traversal_in_progress_ = false;
+    Derived* root_ = nullptr;
+    // No Sonar cpp:S4963 b/c of implicit modification by the `TraversalIndicatorUpdater` RAII class,
+    // even for `const` instance of the `Tree` class (hence the `mutable volatile` keywords).
+    mutable volatile bool traversal_in_progress_ = false;  // NOSONAR cpp:S3687
 };
 
 }  // namespace cavl
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
