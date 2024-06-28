@@ -46,3 +46,6 @@ __pycache__/
 **/.idea/*
 !**/.idea/dictionaries
 !**/.idea/dictionaries/*
+
+# Dumb OS crap
+.DS_Store
