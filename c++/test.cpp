@@ -2,6 +2,8 @@
 
 #include "cavl.hpp"
 
+#include <unity.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -16,7 +18,6 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
-#include <unity.h>
 #include <vector>
 
 #if __cplusplus >= 201703L
