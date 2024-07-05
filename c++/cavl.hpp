@@ -177,12 +177,12 @@ protected:
     {
         if (Node* const n = root)
         {
-            // NOLINTNEXTLINE(qualified-auto)
+            // NOLINTNEXTLINE(*-qualified-auto)
             if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOSONAR cpp:S925
             {
                 return t;
             }
-            if (auto t = visitor(*root))  // NOLINT(qualified-auto)
+            if (auto t = visitor(*root))  // NOLINT(*-qualified-auto)
             {
                 return t;
             }
@@ -207,12 +207,12 @@ protected:
     {
         if (const Node* const n = root)
         {
-            // NOLINTNEXTLINE(qualified-auto)
+            // NOLINTNEXTLINE(*-qualified-auto)
             if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOSONAR cpp:S925
             {
                 return t;
             }
-            if (auto t = visitor(*root))  // NOLINT(qualified-auto)
+            if (auto t = visitor(*root))  // NOLINT(*-qualified-auto)
             {
                 return t;
             }
