@@ -94,7 +94,7 @@ NODISCARD bool checkLinkage(const N<T>* const           self,
 }
 
 template <typename T>
-NODISCARD auto getHeight(const N<T>* const n) -> std::int8_t
+NODISCARD auto getHeight(const N<T>* const n) -> std::int8_t  // NOLINT(misc-no-recursion)
 {
     return (n != nullptr) ? static_cast<std::int8_t>(1 + std::max(getHeight<T>(n->getChildNode(false)),  //
                                                                   getHeight<T>(n->getChildNode(true))))
@@ -120,6 +120,7 @@ NODISCARD std::size_t checkOrdering(const N<T>* const root)
 }
 
 template <typename T>
+// NOLINTNEXTLINE(misc-no-recursion)
 NODISCARD const N<T>* findBrokenAncestry(const N<T>* const n, const N<T>* const parent = nullptr)
 {
     if ((n != nullptr) && (n->getParentNode() == parent))
@@ -137,7 +138,7 @@ NODISCARD const N<T>* findBrokenAncestry(const N<T>* const n, const N<T>* const 
 }
 
 template <typename T>
-NODISCARD const N<T>* findBrokenBalanceFactor(const N<T>* const n)
+NODISCARD const N<T>* findBrokenBalanceFactor(const N<T>* const n)  // NOLINT(misc-no-recursion)
 {
     if (n != nullptr)
     {
