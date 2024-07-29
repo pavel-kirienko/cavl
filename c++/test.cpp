@@ -55,6 +55,7 @@ public:
     using Self::search;
     using Self::remove;
     using Self::traverse;
+    using Self::postOrderTraverse;
     using Self::min;
     using Self::max;
 
@@ -103,7 +104,7 @@ NODISCARD auto getHeight(const N<T>* const n) -> std::int8_t  // NOLINT(misc-no-
 
 /// Returns the size if the tree is ordered correctly, otherwise SIZE_MAX.
 template <typename T>
-NODISCARD std::size_t checkOrdering(const N<T>* const root)
+NODISCARD std::size_t checkNormalOrdering(const N<T>* const root)
 {
     const N<T>* prev  = nullptr;
     bool        valid = true;
@@ -116,7 +117,50 @@ NODISCARD std::size_t checkOrdering(const N<T>* const root)
         prev = &nd;
         size++;
     });
+
     return valid ? size : std::numeric_limits<std::size_t>::max();
+}
+template <typename T>
+std::size_t checkReverseOrdering(const N<T>* const root)
+{
+    const N<T>* prev  = nullptr;
+    bool        valid = true;
+    std::size_t size  = 0;
+    T::traverse(
+        root,
+        [&](const N<T>& nd) {
+            if (prev != nullptr)
+            {
+                valid = valid && (prev->getValue() > nd.getValue());
+            }
+            prev = &nd;
+            size++;
+
+            // Fake `return` to cover other `traverse` overload (the returning one).
+            return false;
+        },
+        true /* reverse */);
+
+    return valid ? size : std::numeric_limits<std::size_t>::max();
+}
+template <typename T>
+NODISCARD std::size_t checkOrdering(const N<T>* const root)
+{
+    const std::size_t ordered = checkNormalOrdering<T>(root);
+    const std::size_t reverse = checkReverseOrdering<T>(root);
+    return (ordered == reverse) ? ordered : std::numeric_limits<std::size_t>::max();
+}
+
+template <typename T>
+void checkPostOrdering(const N<T>* const root, const std::vector<std::uint16_t>& expected, const bool reverse = false)
+{
+    std::vector<std::uint16_t> order;
+    T::postOrderTraverse(root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
+    TEST_ASSERT_EQUAL(expected.size(), order.size());
+    if (!order.empty())
+    {
+        TEST_ASSERT_EQUAL_UINT16_ARRAY(expected.data(), order.data(), order.size());
+    }
 }
 
 template <typename T>
@@ -276,6 +320,12 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
         TEST_ASSERT_EQUAL_INT64(i, tr[i - 1]->getValue());
         TEST_ASSERT_EQUAL_INT64(i, static_cast<const TreeType&>(tr)[i - 1]->getValue());
     }
+    checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8, 17,
+                              19, 18, 21, 23, 22, 20, 25, 27, 26, 29, 31, 30, 28, 24, 16});
+    checkPostOrdering<N>(tr,
+                         {31, 29, 30, 27, 25, 26, 28, 23, 21, 22, 19, 17, 18, 20, 24, 15,
+                          13, 14, 11, 9,  10, 12, 7,  5,  6,  3,  1,  2,  4,  8,  16},
+                         true);
 
     // REMOVE 24
     //                               16
@@ -300,6 +350,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(30, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8,
+                              17, 19, 18, 21, 23, 22, 20, 27, 26, 29, 31, 30, 28, 25, 16});
 
     // REMOVE 25
     //                               16
@@ -320,6 +372,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(29, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8,
+                              17, 19, 18, 21, 23, 22, 20, 27, 29, 31, 30, 28, 26, 16});
 
     // REMOVE 26
     //                               16
@@ -341,6 +395,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(28, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1, 3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12,
+                              8, 17, 19, 18, 21, 23, 22, 20, 29, 28, 31, 30, 27, 16});
 
     // REMOVE 20
     //                               16
@@ -361,6 +417,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(27, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1, 3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12,
+                              8, 17, 19, 18, 23, 22, 21, 29, 28, 31, 30, 27, 16});
 
     // REMOVE 27
     //                               16
@@ -381,6 +439,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(26, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1,  3, 2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14,
+                              12, 8, 17, 19, 18, 23, 22, 21, 29, 31, 30, 28, 16});
 
     // REMOVE 28
     //                               16
@@ -401,6 +461,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(25, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr,
+                         {1, 3, 2, 5, 7, 6, 4, 9, 11, 10, 13, 15, 14, 12, 8, 17, 19, 18, 23, 22, 21, 31, 30, 29, 16});
 
     // REMOVE 29; UNBALANCED TREE BEFORE ROTATION:
     //                               16
@@ -435,6 +497,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(24, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 9, 11, 10, 13, 15, 14, 12, 8, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 8
     //                               16
@@ -455,6 +518,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(23, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 11, 10, 13, 15, 14, 12, 9, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 9
     //                               16
@@ -475,6 +539,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(22, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 1
     //                               16
@@ -494,6 +559,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(21, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 16, the tree got new root.
     //                               17
@@ -517,6 +583,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(20, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 19, 18, 23, 22, 31, 30, 21, 17});
 
     // REMOVE 22, only has one child.
     //                               17
@@ -537,6 +604,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(19, checkOrdering<N>(tr));
+    checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 19, 18, 23, 31, 30, 21, 17});
 
     // Print intermediate state for inspection. Be sure to compare it against the above diagram for extra paranoia.
     std::cout << toGraphviz(tr) << std::endl;
@@ -590,6 +658,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(7, tr.size());
+    checkPostOrdering<N>(tr, {4, 12, 10, 18, 30, 21, 17});
+    checkPostOrdering<N>(tr, {30, 18, 21, 12, 4, 10, 17}, true);
 
     // REMOVE 10, 21.
     //                               17
@@ -615,6 +685,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(5, tr.size());
+    checkPostOrdering<N>(tr, {4, 12, 18, 30, 17});
+    checkPostOrdering<N>(tr, {18, 30, 4, 12, 17}, true);
 
     // REMOVE 12, 18.
     //                               17
@@ -636,6 +708,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(3, tr.size());
+    checkPostOrdering<N>(tr, {4, 30, 17});
+    checkPostOrdering<N>(tr, {30, 4, 17}, true);
 
     // REMOVE 17. 30 is the new root.
     //                               30
@@ -655,6 +729,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[30], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(2, tr.size());
+    checkPostOrdering<N>(tr, {4, 30});
+    checkPostOrdering<N>(tr, {4, 30}, true);
 
     // REMOVE 30. 4 is the only node left.
     //                               4
@@ -671,6 +747,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(t.at(4), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[4], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(1, tr.size());
+    checkPostOrdering<N>(tr, {4});
+    checkPostOrdering<N>(tr, {4}, true);
 
     // Check the move assignment and move constructor of the tree.
     TreeType tr2(std::move(tr));
@@ -695,6 +773,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(nullptr, tr4_const.min());
     TEST_ASSERT_EQUAL(nullptr, tr4_const.max());
     TEST_ASSERT_EQUAL(0, tr4_const.traverse([](const N&) { return 13; }));
+    checkPostOrdering<N>(tr4_const, {});
+    checkPostOrdering<N>(tr4_const, {}, true);
 
     // Clean up manually to reduce boilerplate in the tests. This is super sloppy but OK for a basic test suite.
     for (auto* const x : t)
@@ -820,6 +900,7 @@ public:
     using Self::search;
     using Self::remove;
     using Self::traverse;
+    using Self::postOrderTraverse;
     using Self::min;
     using Self::max;
 
