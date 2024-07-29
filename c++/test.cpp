@@ -155,7 +155,8 @@ template <typename T>
 void checkPostOrdering(const N<T>* const root, const std::vector<std::uint16_t>& expected, const bool reverse = false)
 {
     std::vector<std::uint16_t> order;
-    T::postOrderTraverse(root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
+    T::postOrderTraverse(
+        root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
     TEST_ASSERT_EQUAL(expected.size(), order.size());
     if (!order.empty())
     {
