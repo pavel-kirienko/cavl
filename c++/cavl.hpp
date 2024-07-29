@@ -162,11 +162,7 @@ protected:
     static auto min(const Node* const root) noexcept -> const Derived* { return extremum(root, false); }
     static auto max(const Node* const root) noexcept -> const Derived* { return extremum(root, true); }
 
-    // NOLINTBEGIN(misc-no-recursion)
-
     /// In-order or reverse-in-order traversal of the tree; the visitor is invoked with a reference to each node.
-    /// Required stack depth is bounded by less than 2*log2(size),
-    /// hence no Sonar cpp:S925 and `NOLINT(misc-no-recursion)` exceptions.
     /// If the return type is non-void, then it shall be default-constructable and convertible to bool; in this case,
     /// traversal will stop when the first true value is returned, which is propagated back to the caller; if none
     /// of the calls returned true or the tree is empty, a default value is constructed and returned.
@@ -175,18 +171,50 @@ protected:
     static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<!std::is_void<R>::value, R>
     {
-        if (Node* const n = root)
+        Node* node = root;
+        Node* prev = nullptr;
+
+        while (nullptr != node)
         {
-            // NOLINTNEXTLINE(*-qualified-auto)
-            if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOSONAR cpp:S925
+            Node* next = node->up;
+
+            if (prev == node->up)
             {
-                return t;
+                // We came down to this node from `prev`.
+
+                if (auto* left = node->lr[reverse])
+                {
+                    next = left;
+                }
+                else
+                {
+                    if (auto t = visitor(*down(node)))  // NOLINT(*-qualified-auto)
+                    {
+                        return t;
+                    }
+
+                    if (auto* right = node->lr[!reverse])
+                    {
+                        next = right;
+                    }
+                }
             }
-            if (auto t = visitor(*root))  // NOLINT(*-qualified-auto)
+            else if (prev == node->lr[reverse])
             {
-                return t;
+                // We came up to this node from the left child.
+
+                if (auto t = visitor(*down(node)))  // NOLINT(*-qualified-auto)
+                {
+                    return t;
+                }
+
+                if (auto* right = node->lr[!reverse])
+                {
+                    next = right;
+                }
             }
-            return Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);  // NOSONAR cpp:S925
+
+            prev = std::exchange(node, next);
         }
         return R{};
     }
@@ -194,29 +222,94 @@ protected:
     static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)
         -> std::enable_if_t<std::is_void<invoke_result<Vis, Derived&>>::value>
     {
-        if (Node* const n = root)
+        Node* node = root;
+        Node* prev = nullptr;
+
+        while (nullptr != node)
         {
-            Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);  // NOSONAR cpp:S925
-            visitor(*root);
-            Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);  // NOSONAR cpp:S925
+            Node* next = node->up;
+
+            if (prev == node->up)
+            {
+                // We came down to this node from `prev`.
+
+                if (auto* left = node->lr[reverse])
+                {
+                    next = left;
+                }
+                else
+                {
+                    visitor(*down(node));
+
+                    if (auto* right = node->lr[!reverse])
+                    {
+                        next = right;
+                    }
+                }
+            }
+            else if (prev == node->lr[reverse])
+            {
+                // We came up to this node from the left child.
+
+                visitor(*down(node));
+
+                if (auto* right = node->lr[!reverse])
+                {
+                    next = right;
+                }
+            }
+
+            prev = std::exchange(node, next);
         }
     }
     template <typename Vis, typename R = invoke_result<Vis, const Derived&>>
     static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<!std::is_void<R>::value, R>
     {
-        if (const Node* const n = root)
+        const Node* node = root;
+        const Node* prev = nullptr;
+
+        while (nullptr != node)
         {
-            // NOLINTNEXTLINE(*-qualified-auto)
-            if (auto t = Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse))  // NOSONAR cpp:S925
+            const Node* next = node->up;
+
+            if (prev == node->up)
             {
-                return t;
+                // We came down to this node from `prev`.
+
+                if (auto* left = node->lr[reverse])
+                {
+                    next = left;
+                }
+                else
+                {
+                    if (auto t = visitor(*down(node)))  // NOLINT(*-qualified-auto)
+                    {
+                        return t;
+                    }
+
+                    if (auto* right = node->lr[!reverse])
+                    {
+                        next = right;
+                    }
+                }
             }
-            if (auto t = visitor(*root))  // NOLINT(*-qualified-auto)
+            else if (prev == node->lr[reverse])
             {
-                return t;
+                // We came up to this node from the left child.
+
+                if (auto t = visitor(*down(node)))  // NOLINT(*-qualified-auto)
+                {
+                    return t;
+                }
+
+                if (auto* right = node->lr[!reverse])
+                {
+                    next = right;
+                }
             }
-            return Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);
+
+            prev = std::exchange(node, next);
         }
         return R{};
     }
@@ -224,14 +317,46 @@ protected:
     static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
         -> std::enable_if_t<std::is_void<invoke_result<Vis, const Derived&>>::value>
     {
-        if (const Node* const n = root)
+        const Node* node = root;
+        const Node* prev = nullptr;
+
+        while (nullptr != node)
         {
-            Node::traverse<Vis>(down(n->lr[reverse]), visitor, reverse);  // NOSONAR cpp:S925
-            visitor(*root);
-            Node::traverse<Vis>(down(n->lr[!reverse]), visitor, reverse);  // NOSONAR cpp:S925
+            const Node* next = node->up;
+
+            if (prev == node->up)
+            {
+                // We came down to this node from `prev`.
+
+                if (auto* left = node->lr[reverse])
+                {
+                    next = left;
+                }
+                else
+                {
+                    visitor(*down(node));
+
+                    if (auto* right = node->lr[!reverse])
+                    {
+                        next = right;
+                    }
+                }
+            }
+            else if (prev == node->lr[reverse])
+            {
+                // We came up to this node from the left child.
+
+                visitor(*down(node));
+
+                if (auto* right = node->lr[!reverse])
+                {
+                    next = right;
+                }
+            }
+
+            prev = std::exchange(node, next);
         }
     }
-    // NOLINTEND(misc-no-recursion)
 
 private:
     void rotate(const bool r) noexcept
@@ -640,7 +765,7 @@ public:
         return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
     }
 
-    /// Beware that this convenience method has linear complexity and uses recursion. Use responsibly.
+    /// Beware that this convenience method has linear complexity. Use responsibly.
     auto size() const noexcept
     {
         auto i = 0UL;
