@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 /// If CAVL is used in throughput-critical code, then it is recommended to disable assertion checks as they may
 /// be costly in terms of execution time.
