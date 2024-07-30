@@ -193,6 +193,20 @@ protected:
         inOrderTraverseImpl<const Node>(root, visitor, reverse);
     }
 
+    /// @breaf Post-order (or reverse-post-order) traversal of the tree.
+    ///
+    /// "Post" nature of the traversal guarantees that, once a node reference is passed to the visitor,
+    /// traversal won't use or reference this node anymore, so it is safe to modify the node in the visitor -
+    /// f.e. deallocate node's memory for an efficient "release whole tree" scenario. But the tree itself
+    /// shall not be modified while traversal is in progress, otherwise bad memory access will likely occur.
+    ///
+    /// @param root The root node of the tree to traverse.
+    /// @param visitor The callable object to invoke for each node. The visitor is invoked with a reference
+    ///                to each node as a POST-action call, AFTER visiting all of its children.
+    /// @param reverse If `false`, the traversal visits first "left" children, then "right" children.
+    ///                If `true`, the traversal is performed in reverse order ("right" first, then "left").
+    ///                In either case, the current node is visited last (hence the post-order).
+    ///
     template <typename Vis>
     static void postOrderTraverse(Derived* const root, const Vis& visitor, const bool reverse = false)
     {
