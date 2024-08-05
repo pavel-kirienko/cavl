@@ -137,7 +137,7 @@ std::size_t checkReverseOrdering(const N<T>* const root)
             prev = &nd;
             size++;
 
-            // Fake `return` to cover other `traverse` overload (the returning one).
+            // Fake `return` to cover other `traverseInOrder` overload (the returning one).
             return false;
         },
         true /* reverse */);
