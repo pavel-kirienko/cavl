@@ -52,10 +52,11 @@ public:
     using Self::getChildNode;
     using Self::getParentNode;
     using Self::getBalanceFactor;
+    using Self::getRootNodePtr;
     using Self::search;
     using Self::remove;
-    using Self::traverse;
-    using Self::postOrderTraverse;
+    using Self::traverseInOrder;
+    using Self::traversePostOrder;
     using Self::min;
     using Self::max;
 
@@ -109,7 +110,7 @@ NODISCARD std::size_t checkNormalOrdering(const N<T>* const root)
     const N<T>* prev  = nullptr;
     bool        valid = true;
     std::size_t size  = 0;
-    T::traverse(root, [&](const N<T>& nd) {
+    T::traverseInOrder(root, [&](const N<T>& nd) {
         if (prev != nullptr)
         {
             valid = valid && (prev->getValue() < nd.getValue());
@@ -126,7 +127,7 @@ std::size_t checkReverseOrdering(const N<T>* const root)
     const N<T>* prev  = nullptr;
     bool        valid = true;
     std::size_t size  = 0;
-    T::traverse(
+    T::traverseInOrder(
         root,
         [&](const N<T>& nd) {
             if (prev != nullptr)
@@ -155,8 +156,7 @@ template <typename T>
 void checkPostOrdering(const N<T>* const root, const std::vector<std::uint16_t>& expected, const bool reverse = false)
 {
     std::vector<std::uint16_t> order;
-    T::postOrderTraverse(
-        root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
+    T::traversePostOrder(root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
     TEST_ASSERT_EQUAL(expected.size(), order.size());
     if (!order.empty())
     {
@@ -218,13 +218,13 @@ NODISCARD auto toGraphviz(const cavl::Tree<T>& tr) -> std::string
        << "node[style=filled,shape=circle,fontcolor=white,penwidth=0,fontname=\"monospace\",fixedsize=1,fontsize=18];\n"
        << "edge[arrowhead=none,penwidth=2];\n"
        << "nodesep=0.0;ranksep=0.3;splines=false;\n";
-    tr.traverse([&](const typename cavl::Tree<T>::DerivedType& x) {
+    tr.traverseInOrder([&](const typename cavl::Tree<T>::DerivedType& x) {
         const char* const fill_color =  // NOLINTNEXTLINE(*-avoid-nested-conditional-operator)
             (x.getBalanceFactor() == 0) ? "black" : ((x.getBalanceFactor() > 0) ? "orange" : "blue");
         ss << x.getValue() << "[fillcolor=" << fill_color << "];";
     });
     ss << "\n";
-    tr.traverse([&](const typename cavl::Tree<T>::DerivedType& x) {
+    tr.traverseInOrder([&](const typename cavl::Tree<T>::DerivedType& x) {
         if (const auto* const ch = x.getChildNode(false))
         {
             ss << x.getValue() << ":sw->" << ch->getValue() << ":n;";
@@ -244,7 +244,7 @@ auto getRandomByte()
 }
 
 template <typename N>
-void testManual(const std::function<N*(std::uint8_t)>& factory)
+void testManual(const std::function<N*(std::uint8_t)>& factory, const std::function<N*(N*)>& node_mover)
 {
     using TreeType = typename N::TreeType;
     std::vector<N*> t;
@@ -300,7 +300,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     // Check composition -- ensure that every element is in the tree and it is there exactly once.
     {
         bool seen[32]{};
-        tr.traverse([&](const N& n) {
+        tr.traverseInOrder([&](const N& n) {
             TEST_ASSERT_FALSE(seen[n.getValue()]);
             seen[n.getValue()] = true;
         });
@@ -327,6 +327,11 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
                          {31, 29, 30, 27, 25, 26, 28, 23, 21, 22, 19, 17, 18, 20, 24, 15,
                           13, 14, 11, 9,  10, 12, 7,  5,  6,  3,  1,  2,  4,  8,  16},
                          true);
+
+    // MOVE 16, 18 & 23
+    t[16] = node_mover(t[16]);
+    t[18] = node_mover(t[18]);
+    t[23] = node_mover(t[23]);
 
     // REMOVE 24
     //                               16
@@ -773,7 +778,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory)
     TEST_ASSERT_EQUAL(0, tr4_const.size());
     TEST_ASSERT_EQUAL(nullptr, tr4_const.min());
     TEST_ASSERT_EQUAL(nullptr, tr4_const.max());
-    TEST_ASSERT_EQUAL(0, tr4_const.traverse([](const N&) { return 13; }));
+    TEST_ASSERT_EQUAL(0, tr4_const.traverseInOrder([](const N&) { return 13; }));
     checkPostOrdering<N>(tr4_const, {});
     checkPostOrdering<N>(tr4_const, {}, true);
 
@@ -806,7 +811,7 @@ void testRandomized()
         TEST_ASSERT_NULL(findBrokenAncestry<My>(root));
         TEST_ASSERT_EQUAL(size, checkOrdering<My>(root));
         std::array<bool, 256> new_mask{};
-        root.traverse([&](const My& node) { new_mask.at(node.getValue()) = true; });
+        root.traverseInOrder([&](const My& node) { new_mask.at(node.getValue()) = true; });
         TEST_ASSERT_EQUAL(mask, new_mask);  // Otherwise, the contents of the tree does not match our expectations.
     };
     validate();
@@ -885,9 +890,20 @@ void testRandomized()
 
 void testManualMy()
 {
-    testManual<My>([](const std::uint16_t x) {
-        return new My(x);  // NOLINT
-    });
+    testManual<My>(
+        [](const std::uint16_t x) {
+            return new My(x);  // NOLINT
+        },
+        [](My* const old_node) {
+            const auto value    = old_node->getValue();
+            My** const root_ptr = old_node->getRootNodePtr();
+            My* const  new_node = new My(std::move(*old_node));  // NOLINT(*-owning-memory)
+            TEST_ASSERT_EQUAL(value, new_node->getValue());
+            TEST_ASSERT_EQUAL(root_ptr, new_node->getRootNodePtr());
+            TEST_ASSERT_EQUAL(nullptr, old_node->getRootNodePtr());
+            delete old_node;  // NOLINT(*-owning-memory)
+            return new_node;
+        });
 }
 
 /// Ensure that polymorphic types can be used with the tree. The tree node type itself is not polymorphic!
@@ -900,23 +916,26 @@ public:
     using Self::getBalanceFactor;
     using Self::search;
     using Self::remove;
-    using Self::traverse;
-    using Self::postOrderTraverse;
+    using Self::traverseInOrder;
+    using Self::traversePostOrder;
     using Self::min;
     using Self::max;
 
     V()                    = default;
     virtual ~V()           = default;
     V(const V&)            = delete;
-    V(V&&)                 = delete;
     V& operator=(const V&) = delete;
-    V& operator=(V&&)      = delete;
 
+    V& operator=(V&&) noexcept = default;
+    V(V&&) noexcept            = default;
+
+    NODISCARD virtual V*   clone()                           = 0;
     NODISCARD virtual auto getValue() const -> std::uint16_t = 0;
 
 private:
     using E = struct
     {};
+    UNUSED E root_ptr;
     UNUSED E up;
     UNUSED E lr;
     UNUSED E bf;
@@ -930,6 +949,10 @@ template <std::uint8_t Value>
 class VValue : public VValue<static_cast<std::uint8_t>(Value - 1)>
 {
 public:
+    NODISCARD V* clone() override
+    {
+        return new VValue(std::move(*this));  // NOLINT(*-owning-memory)
+    }
     NODISCARD auto getValue() const -> std::uint16_t override
     {
         return static_cast<std::uint16_t>(VValue<static_cast<std::uint8_t>(Value - 1)>::getValue() + 1);
@@ -939,6 +962,10 @@ template <>
 class VValue<0> : public V
 {
 public:
+    NODISCARD V* clone() override
+    {
+        return new VValue(std::move(*this));  // NOLINT(*-owning-memory)
+    }
     NODISCARD auto getValue() const -> std::uint16_t override { return 0; }
 };
 
@@ -970,7 +997,11 @@ auto makeV(const std::uint8_t val) -> V*
 
 void testManualV()
 {
-    testManual<V>(&makeV<>);
+    testManual<V>(&makeV<>, [](V* const old_node) {  //
+        auto* const new_node = old_node->clone();
+        delete old_node;  // NOLINT(*-owning-memory)
+        return new_node;
+    });
 }
 
 }  // namespace

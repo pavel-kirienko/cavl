@@ -56,9 +56,12 @@ class Tree;
 /// The worst-case complexity of all operations is O(log n), unless specifically noted otherwise.
 /// Note that this class has no public members. The user type should re-export them if needed (usually it is not).
 /// The size of this type is 4x pointer size (16 bytes on a 32-bit platform).
+///
 /// No Sonar cpp:S1448 b/c this is the main node entity without public members - maintainability is not a concern here.
+/// No Sonar cpp:S4963 b/c `Node` supports move operation.
+///
 template <typename Derived>
-class Node  // NOSONAR cpp:S1448
+class Node  // NOSONAR cpp:S1448 cpp:S4963
 {
     // Polyfill for C++17's std::invoke_result_t.
     template <typename F, typename... Args>
@@ -78,11 +81,14 @@ public:
     Node(const Node&)                    = delete;
     auto operator=(const Node&) -> Node& = delete;
 
-    // They can't be moved either, but the reason is less obvious.
-    // While we can trivially update the pointers in the adjacent nodes to keep the tree valid,
-    // we can't update external references to the tree. This breaks the tree if one attempted to move its root node.
-    Node(Node&& other)                    = delete;
-    auto operator=(Node&& other) -> Node& = delete;
+    // Tree nodes can be moved. We update the pointers in the adjacent nodes to keep the tree valid,
+    // as well as root node pointer if needed (see `moveFrom`). This operation is constant time.
+    Node(Node&& other) noexcept { moveFrom(other); }
+    auto operator=(Node&& other) noexcept -> Node&
+    {
+        moveFrom(other);
+        return *this;
+    }
 
 protected:
     Node()  = default;
@@ -94,6 +100,7 @@ protected:
     auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
     auto getChildNode(const bool right) const noexcept -> const Derived* { return down(lr[right]); }
     auto getBalanceFactor() const noexcept { return bf; }
+    auto getRootNodePtr() noexcept -> Derived** { return root_ptr; }
 
     /// Find a node for which the predicate returns zero, or nullptr if there is no such node or the tree is empty.
     /// The predicate is invoked with a single argument which is a constant reference to Derived.
@@ -170,28 +177,28 @@ protected:
     /// of the calls returned true or the tree is empty, a default value is constructed and returned.
     /// The tree shall not be modified while traversal is in progress, otherwise bad memory access will likely occur.
     template <typename Vis, typename R = invoke_result<Vis, Derived&>>
-    static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)  //
+    static auto traverseInOrder(Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<!std::is_void<R>::value, R>
     {
-        return inOrderTraverseImpl<R, Node>(root, visitor, reverse);
+        return traverseInOrderImpl<R, Node>(root, visitor, reverse);
     }
     template <typename Vis>
-    static auto traverse(Derived* const root, const Vis& visitor, const bool reverse = false)  //
+    static auto traverseInOrder(Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<std::is_void<invoke_result<Vis, Derived&>>::value>
     {
-        inOrderTraverseImpl<Node>(root, visitor, reverse);
+        traverseInOrderImpl<Node>(root, visitor, reverse);
     }
     template <typename Vis, typename R = invoke_result<Vis, const Derived&>>
-    static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
+    static auto traverseInOrder(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<!std::is_void<R>::value, R>
     {
-        return inOrderTraverseImpl<R, const Node>(root, visitor, reverse);
+        return traverseInOrderImpl<R, const Node>(root, visitor, reverse);
     }
     template <typename Vis>
-    static auto traverse(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
+    static auto traverseInOrder(const Derived* const root, const Vis& visitor, const bool reverse = false)  //
         -> std::enable_if_t<std::is_void<invoke_result<Vis, const Derived&>>::value>
     {
-        inOrderTraverseImpl<const Node>(root, visitor, reverse);
+        traverseInOrderImpl<const Node>(root, visitor, reverse);
     }
 
     /// @breaf Post-order (or reverse-post-order) traversal of the tree.
@@ -209,17 +216,49 @@ protected:
     ///                In either case, the current node is visited last (hence the post-order).
     ///
     template <typename Vis>
-    static void postOrderTraverse(Derived* const root, const Vis& visitor, const bool reverse = false)
+    static void traversePostOrder(Derived* const root, const Vis& visitor, const bool reverse = false)
     {
-        postOrderTraverseImpl<Node>(root, visitor, reverse);
+        traversePostOrderImpl<Node>(root, visitor, reverse);
     }
     template <typename Vis>
-    static void postOrderTraverse(const Derived* const root, const Vis& visitor, const bool reverse = false)
+    static void traversePostOrder(const Derived* const root, const Vis& visitor, const bool reverse = false)
     {
-        postOrderTraverseImpl<const Node>(root, visitor, reverse);
+        traversePostOrderImpl<const Node>(root, visitor, reverse);
     }
 
 private:
+    void moveFrom(Node& other) noexcept
+    {
+        root_ptr = other.root_ptr;
+        up       = other.up;
+        lr[0]    = other.lr[0];
+        lr[1]    = other.lr[1];
+        bf       = other.bf;
+
+        if (nullptr != up)
+        {
+            up->lr[up->lr[1] == &other] = this;
+        }
+        else
+        {
+            if (nullptr != root_ptr)
+            {
+                *root_ptr = down(this);
+            }
+        }
+
+        if (nullptr != lr[0])
+        {
+            lr[0]->up = this;
+        }
+        if (nullptr != lr[1])
+        {
+            lr[1]->up = this;
+        }
+
+        other.unlink();
+    }
+
     void rotate(const bool r) noexcept
     {
         CAVL_ASSERT((lr[!r] != nullptr) && ((bf >= -1) && (bf <= +1)));
@@ -243,19 +282,20 @@ private:
     auto retraceOnGrowth() noexcept -> Node*;
 
     template <typename NodeT, typename DerivedT, typename Vis>
-    static void inOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse);
+    static void traverseInOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse);
     template <typename Result, typename NodeT, typename DerivedT, typename Vis>
-    static auto inOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse) -> Result;
+    static auto traverseInOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse) -> Result;
 
     template <typename NodeT, typename DerivedT, typename Vis>
-    static void postOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse);
+    static void traversePostOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse);
 
     void unlink() noexcept
     {
-        up    = nullptr;
-        lr[0] = nullptr;
-        lr[1] = nullptr;
-        bf    = 0;
+        root_ptr = nullptr;
+        up       = nullptr;
+        lr[0]    = nullptr;
+        lr[1]    = nullptr;
+        bf       = 0;
     }
 
     static auto extremum(Node* const root, const bool maximum) noexcept -> Derived*
@@ -287,8 +327,8 @@ private:
 
     friend class Tree<Derived>;
 
-    // The binary layout is compatible with the C version.
-    Node*                up = nullptr;
+    Derived**            root_ptr = nullptr;
+    Node*                up       = nullptr;
     std::array<Node*, 2> lr{};
     std::int8_t          bf = 0;
 };
@@ -335,7 +375,8 @@ auto Node<Derived>::search(Derived*& root, const Pre& predicate, const Fac& fact
         root = down(out);
     }
     out->unlink();
-    out->up = up;
+    out->up       = up;
+    out->root_ptr = &root;
     if (Node* const rt = out->retraceOnGrowth())
     {
         root = down(rt);
@@ -524,7 +565,7 @@ auto Node<Derived>::retraceOnGrowth() noexcept -> Node*
 // No Sonar cpp:S134 b/c this is the main in-order traversal tool - maintainability is not a concern here.
 template <typename Derived>
 template <typename NodeT, typename DerivedT, typename Vis>
-void Node<Derived>::inOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse)
+void Node<Derived>::traverseInOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse)
 {
     NodeT* node = root;
     NodeT* prev = nullptr;
@@ -574,7 +615,7 @@ void Node<Derived>::inOrderTraverseImpl(DerivedT* const root, const Vis& visitor
 // No Sonar cpp:S134 b/c this is the main in-order returning traversal tool - maintainability is not a concern here.
 template <typename Derived>
 template <typename Result, typename NodeT, typename DerivedT, typename Vis>
-auto Node<Derived>::inOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse) -> Result
+auto Node<Derived>::traverseInOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse) -> Result
 {
     NodeT* node = root;
     NodeT* prev = nullptr;
@@ -631,7 +672,7 @@ auto Node<Derived>::inOrderTraverseImpl(DerivedT* const root, const Vis& visitor
 
 template <typename Derived>
 template <typename NodeT, typename DerivedT, typename Vis>
-void Node<Derived>::postOrderTraverseImpl(DerivedT* const root, const Vis& visitor, const bool reverse)
+void Node<Derived>::traversePostOrderImpl(DerivedT* const root, const Vis& visitor, const bool reverse)
 {
     NodeT* node = root;
     NodeT* prev = nullptr;
@@ -752,32 +793,32 @@ public:
     auto min() const noexcept -> const Derived* { return NodeType::min(*this); }
     auto max() const noexcept -> const Derived* { return NodeType::max(*this); }
 
-    /// Wraps NodeType<>::traverse().
+    /// Wraps NodeType<>::traverseInOrder().
     template <typename Vis>
-    auto traverse(const Vis& visitor, const bool reverse = false)
+    auto traverseInOrder(const Vis& visitor, const bool reverse = false)
     {
         const TraversalIndicatorUpdater upd(*this);
-        return NodeType::template traverse<Vis>(*this, visitor, reverse);
+        return NodeType::template traverseInOrder<Vis>(*this, visitor, reverse);
     }
     template <typename Vis>
-    auto traverse(const Vis& visitor, const bool reverse = false) const
+    auto traverseInOrder(const Vis& visitor, const bool reverse = false) const
     {
         const TraversalIndicatorUpdater upd(*this);
-        return NodeType::template traverse<Vis>(*this, visitor, reverse);
+        return NodeType::template traverseInOrder<Vis>(*this, visitor, reverse);
     }
 
-    /// Wraps NodeType<>::postOrderTraverse().
+    /// Wraps NodeType<>::traversePostOrder().
     template <typename Vis>
-    void postOrderTraverse(const Vis& visitor, const bool reverse = false)
+    void traversePostOrder(const Vis& visitor, const bool reverse = false)
     {
         const TraversalIndicatorUpdater upd(*this);
-        NodeType::template postOrderTraverse<Vis>(*this, visitor, reverse);
+        NodeType::template traversePostOrder<Vis>(*this, visitor, reverse);
     }
     template <typename Vis>
-    void postOrderTraverse(const Vis& visitor, const bool reverse = false) const
+    void traversePostOrder(const Vis& visitor, const bool reverse = false) const
     {
         const TraversalIndicatorUpdater upd(*this);
-        NodeType::template postOrderTraverse<Vis>(*this, visitor, reverse);
+        NodeType::template traversePostOrder<Vis>(*this, visitor, reverse);
     }
 
     /// Normally these are not needed except if advanced introspection is desired.
@@ -799,20 +840,20 @@ public:
     {
         std::size_t i = index;
         // No Sonar cpp:S881 b/c this decrement is pretty much straightforward - no maintenance concerns.
-        return traverse([&i](auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
+        return traverseInOrder([&i](auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
     }
     auto operator[](const std::size_t index) const -> const Derived*
     {
         std::size_t i = index;
         // No Sonar cpp:S881 b/c this decrement is pretty much straightforward - no maintenance concerns.
-        return traverse([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
+        return traverseInOrder([&i](const auto& x) { return (i-- == 0) ? &x : nullptr; });  // NOSONAR cpp:S881
     }
 
     /// Beware that this convenience method has linear complexity. Use responsibly.
     auto size() const noexcept
     {
         auto i = 0UL;
-        traverse([&i](auto& /*unused*/) { i++; });
+        traverseInOrder([&i](auto& /*unused*/) { i++; });
         return i;
     }
 
@@ -825,7 +866,7 @@ private:
     static_assert(std::is_same<Tree<Derived>, typename NodeType::TreeType>::value, "Internal check: Bad type alias");
 
     /// We use a simple boolean flag instead of a nesting counter to avoid race conditions on the counter update.
-    /// This implies that in the case of concurrent or recursive traversal (more than one call to traverse() within
+    /// This implies that in the case of concurrent or recursive traversal (more than one call to traverseXxx() within
     /// the same call stack) we may occasionally fail to detect a bona fide case of a race condition, but this is
     /// acceptable because the purpose of this feature is to provide a mere best-effort data race detection.
     ///
