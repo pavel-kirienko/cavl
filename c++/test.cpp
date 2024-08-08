@@ -49,10 +49,11 @@ class My : public cavl::Node<My>
 public:
     explicit My(const std::uint16_t v) : value(v) {}
     using Self = cavl::Node<My>;
+    using Self::isLinked;
+    using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
     using Self::getBalanceFactor;
-    using Self::getRootNodePtr;
     using Self::search;
     using Self::remove;
     using Self::traverseInOrder;
@@ -271,7 +272,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
         const auto pred = [&](const N& v) { return t.at(i)->getValue() - v.getValue(); };
         TEST_ASSERT_NULL(tr.search(pred));
         TEST_ASSERT_NULL(static_cast<const TreeType&>(tr).search(pred));
+        TEST_ASSERT_FALSE(t[i]->isLinked());
         auto result = tr.search(pred, [&]() { return t[i]; });
+        TEST_ASSERT_TRUE(t[i]->isLinked());
         TEST_ASSERT_EQUAL(t[i], std::get<0>(result));
         TEST_ASSERT_FALSE(std::get<1>(result));
         TEST_ASSERT_EQUAL(t[i], tr.search(pred));
@@ -328,11 +331,18 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
                          {31, 29, 30, 27, 25, 26, 28, 23, 21, 22, 19, 17, 18, 20, 24, 15,
                           13, 14, 11, 9,  10, 12, 7,  5,  6,  3,  1,  2,  4,  8,  16},
                          true);
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[24]->isRoot());
 
     // MOVE 16, 18 & 23
     t[16] = node_mover(t[16]);
     t[18] = node_mover(t[18]);
     t[23] = node_mover(t[23]);
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[18]->isRoot());
+    TEST_ASSERT_TRUE(t[18]->isLinked());
+    TEST_ASSERT_FALSE(t[23]->isRoot());
+    TEST_ASSERT_TRUE(t[23]->isLinked());
 
     // REMOVE 24
     //                               16
@@ -357,6 +367,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(30, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[24]->isRoot());
+    TEST_ASSERT_FALSE(t[24]->isLinked());
     checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8,
                               17, 19, 18, 21, 23, 22, 20, 27, 26, 29, 31, 30, 28, 25, 16});
 
@@ -379,6 +392,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(29, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[25]->isRoot());
+    TEST_ASSERT_FALSE(t[25]->isLinked());
     checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8,
                               17, 19, 18, 21, 23, 22, 20, 27, 29, 31, 30, 28, 26, 16});
 
@@ -402,6 +418,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(28, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[26]->isRoot());
+    TEST_ASSERT_FALSE(t[26]->isLinked());
     checkPostOrdering<N>(tr, {1, 3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12,
                               8, 17, 19, 18, 21, 23, 22, 20, 29, 28, 31, 30, 27, 16});
 
@@ -424,6 +443,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(27, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[20]->isRoot());
+    TEST_ASSERT_FALSE(t[20]->isLinked());
     checkPostOrdering<N>(tr, {1, 3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12,
                               8, 17, 19, 18, 23, 22, 21, 29, 28, 31, 30, 27, 16});
 
@@ -446,6 +468,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(26, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[27]->isRoot());
+    TEST_ASSERT_FALSE(t[27]->isLinked());
     checkPostOrdering<N>(tr, {1,  3, 2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14,
                               12, 8, 17, 19, 18, 23, 22, 21, 29, 31, 30, 28, 16});
 
@@ -468,6 +493,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(25, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[28]->isRoot());
+    TEST_ASSERT_FALSE(t[28]->isLinked());
     checkPostOrdering<N>(tr,
                          {1, 3, 2, 5, 7, 6, 4, 9, 11, 10, 13, 15, 14, 12, 8, 17, 19, 18, 23, 22, 21, 31, 30, 29, 16});
 
@@ -504,6 +532,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(24, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[29]->isRoot());
+    TEST_ASSERT_FALSE(t[29]->isLinked());
     checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 9, 11, 10, 13, 15, 14, 12, 8, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 8
@@ -525,6 +556,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(23, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[8]->isRoot());
+    TEST_ASSERT_FALSE(t[8]->isLinked());
     checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 11, 10, 13, 15, 14, 12, 9, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 9
@@ -546,6 +580,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(22, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[9]->isRoot());
+    TEST_ASSERT_FALSE(t[9]->isLinked());
     checkPostOrdering<N>(tr, {1, 3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 1
@@ -566,6 +603,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(21, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[1]->isRoot());
+    TEST_ASSERT_FALSE(t[1]->isLinked());
     checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 17, 19, 18, 23, 22, 31, 30, 21, 16});
 
     // REMOVE 16, the tree got new root.
@@ -590,6 +630,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(20, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[17]->isRoot());
+    TEST_ASSERT_FALSE(t[16]->isRoot());
+    TEST_ASSERT_FALSE(t[16]->isLinked());
     checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 19, 18, 23, 22, 31, 30, 21, 17});
 
     // REMOVE 22, only has one child.
@@ -611,6 +654,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_NULL(findBrokenBalanceFactor<N>(tr));
     TEST_ASSERT_NULL(findBrokenAncestry<N>(tr));
     TEST_ASSERT_EQUAL(19, checkOrdering<N>(tr));
+    TEST_ASSERT_TRUE(t[17]->isRoot());
+    TEST_ASSERT_FALSE(t[22]->isRoot());
+    TEST_ASSERT_FALSE(t[22]->isLinked());
     checkPostOrdering<N>(tr, {3, 2, 5, 7, 6, 4, 11, 13, 15, 14, 12, 10, 19, 18, 23, 31, 30, 21, 17});
 
     // Print intermediate state for inspection. Be sure to compare it against the above diagram for extra paranoia.
@@ -665,6 +711,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(7, tr.size());
+    TEST_ASSERT_TRUE(t[17]->isRoot());
     checkPostOrdering<N>(tr, {4, 12, 10, 18, 30, 21, 17});
     checkPostOrdering<N>(tr, {30, 18, 21, 12, 4, 10, 17}, true);
 
@@ -692,6 +739,11 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(5, tr.size());
+    TEST_ASSERT_TRUE(t[17]->isRoot());
+    TEST_ASSERT_FALSE(t[10]->isRoot());
+    TEST_ASSERT_FALSE(t[10]->isLinked());
+    TEST_ASSERT_FALSE(t[21]->isRoot());
+    TEST_ASSERT_FALSE(t[21]->isLinked());
     checkPostOrdering<N>(tr, {4, 12, 18, 30, 17});
     checkPostOrdering<N>(tr, {18, 30, 4, 12, 17}, true);
 
@@ -715,6 +767,11 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[17], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(3, tr.size());
+    TEST_ASSERT_TRUE(t[17]->isRoot());
+    TEST_ASSERT_FALSE(t[12]->isRoot());
+    TEST_ASSERT_FALSE(t[12]->isLinked());
+    TEST_ASSERT_FALSE(t[18]->isRoot());
+    TEST_ASSERT_FALSE(t[18]->isLinked());
     checkPostOrdering<N>(tr, {4, 30, 17});
     checkPostOrdering<N>(tr, {30, 4, 17}, true);
 
@@ -736,6 +793,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(30), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[30], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(2, tr.size());
+    TEST_ASSERT_TRUE(t[30]->isRoot());
+    TEST_ASSERT_FALSE(t[17]->isRoot());
+    TEST_ASSERT_FALSE(t[17]->isLinked());
     checkPostOrdering<N>(tr, {4, 30});
     checkPostOrdering<N>(tr, {4, 30}, true);
 
@@ -754,6 +814,9 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(4), static_cast<const TreeType&>(tr).max());
     TEST_ASSERT_EQUAL(t[4], static_cast<N*>(tr));
     TEST_ASSERT_EQUAL(1, tr.size());
+    TEST_ASSERT_TRUE(t[4]->isRoot());
+    TEST_ASSERT_FALSE(t[30]->isRoot());
+    TEST_ASSERT_FALSE(t[30]->isLinked());
     checkPostOrdering<N>(tr, {4});
     checkPostOrdering<N>(tr, {4}, true);
 
@@ -767,6 +830,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(t.at(4), static_cast<N*>(tr3));  // Moved.
     TEST_ASSERT_NULL(static_cast<N*>(tr2));            // NOLINT use after move is intentional.
     TEST_ASSERT_EQUAL(1, tr3.size());
+    TEST_ASSERT_TRUE(t[4]->isRoot());
 
     // Try various methods on empty tree (including `const` one).
     //
@@ -780,6 +844,8 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
     TEST_ASSERT_EQUAL(nullptr, tr4_const.min());
     TEST_ASSERT_EQUAL(nullptr, tr4_const.max());
     TEST_ASSERT_EQUAL(0, tr4_const.traverseInOrder([](const N&) { return 13; }));
+    TEST_ASSERT_FALSE(t[4]->isRoot());
+    TEST_ASSERT_FALSE(t[4]->isLinked());
     checkPostOrdering<N>(tr4_const, {});
     checkPostOrdering<N>(tr4_const, {}, true);
 
@@ -897,11 +963,8 @@ void testManualMy()
         },
         [](My* const old_node) {
             const auto value    = old_node->getValue();
-            My** const root_ptr = old_node->getRootNodePtr();
             My* const  new_node = new My(std::move(*old_node));  // NOLINT(*-owning-memory)
             TEST_ASSERT_EQUAL(value, new_node->getValue());
-            TEST_ASSERT_EQUAL(root_ptr, new_node->getRootNodePtr());
-            TEST_ASSERT_EQUAL(nullptr, old_node->getRootNodePtr());
             delete old_node;  // NOLINT(*-owning-memory)
             return new_node;
         });
@@ -912,6 +975,8 @@ class V : public cavl::Node<V>
 {
 public:
     using Self = cavl::Node<V>;
+    using Self::isLinked;
+    using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
     using Self::getBalanceFactor;
