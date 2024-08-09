@@ -96,7 +96,7 @@ protected:
 
     /// Accessors for advanced tree introspection. Not needed for typical usage.
     bool isLinked() const noexcept { return nullptr != up; }
-    bool isRoot() const noexcept { return isLinked() && !up->isLinked(); }
+    bool isRoot() const noexcept { return isLinked() && (!up->isLinked()); }
     auto getParentNode() noexcept -> Derived* { return isRoot() ? nullptr : down(up); }
     auto getParentNode() const noexcept -> const Derived* { return isRoot() ? nullptr : down(up); }
     auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
