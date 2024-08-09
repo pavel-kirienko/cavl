@@ -734,15 +734,6 @@ public:
     using NodeType    = ::cavl::Node<Derived>;
     using DerivedType = Derived;
 
-    explicit Tree(Derived* const root)
-    {
-        if (nullptr != root)
-        {
-            CAVL_ASSERT(nullptr == root->up);  // Should not be part of any tree yet.
-            root->up           = this;
-            origin_node_.lr[0] = root;
-        }
-    }
     Tree()  = default;
     ~Tree() = default;
 
