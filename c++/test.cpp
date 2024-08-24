@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #if __cplusplus >= 201703L
@@ -47,12 +48,14 @@ constexpr auto Zzzzz = nullptr;
 class My : public cavl::Node<My>
 {
 public:
+    My() = default;
     explicit My(const std::uint16_t v) : value(v) {}
     using Self = cavl::Node<My>;
     using Self::isLinked;
     using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
+    using Self::getNextInOrderNode;
     using Self::getBalanceFactor;
     using Self::search;
     using Self::remove;
@@ -157,8 +160,7 @@ template <typename T>
 void checkPostOrdering(const N<T>* const root, const std::vector<std::uint16_t>& expected, const bool reverse = false)
 {
     std::vector<std::uint16_t> order;
-    T::traversePostOrder(
-        root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
+    T::traversePostOrder(root, [&](const N<T>& nd) { order.push_back(nd.getValue()); }, reverse);
     TEST_ASSERT_EQUAL(expected.size(), order.size());
     if (!order.empty())
     {
@@ -273,7 +275,7 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
         TEST_ASSERT_NULL(tr.search(pred));
         TEST_ASSERT_NULL(static_cast<const TreeType&>(tr).search(pred));
         TEST_ASSERT_FALSE(t[i]->isLinked());
-        auto result = tr.search(pred, [&]() { return t[i]; });
+        auto result = tr.search(pred, [&] { return t[i]; });
         TEST_ASSERT_TRUE(t[i]->isLinked());
         TEST_ASSERT_EQUAL(t[i], std::get<0>(result));
         TEST_ASSERT_FALSE(std::get<1>(result));
@@ -324,6 +326,13 @@ void testManual(const std::function<N*(std::uint8_t)>& factory, const std::funct
         TEST_ASSERT_NOT_NULL(tr[i - 1]);
         TEST_ASSERT_EQUAL_INT64(i, tr[i - 1]->getValue());
         TEST_ASSERT_EQUAL_INT64(i, static_cast<const TreeType&>(tr)[i - 1]->getValue());
+
+        // Check the in-order successor.
+        TEST_ASSERT_EQUAL(i < 31 ? t.at(i + 1) : nullptr,
+                          static_cast<const TreeType&>(tr)[i - 1]->getNextInOrderNode());
+        // Check the reverse in-order predecessor.
+        const auto ri = 32 - i;
+        TEST_ASSERT_EQUAL(ri > 1 ? t.at(ri - 1) : nullptr, tr[ri - 1]->getNextInOrderNode(true));  // reverse
     }
     checkPostOrdering<N>(tr, {1,  3,  2,  5,  7,  6,  4,  9,  11, 10, 13, 15, 14, 12, 8, 17,
                               19, 18, 21, 23, 22, 20, 25, 27, 26, 29, 31, 30, 28, 24, 16});
@@ -869,7 +878,7 @@ void testRandomized()
     std::uint64_t         cnt_addition = 0;
     std::uint64_t         cnt_removal  = 0;
 
-    const auto validate = [&]() {
+    const auto validate = [&] {
         TEST_ASSERT_EQUAL(size,
                           std::accumulate(mask.begin(), mask.end(), 0U, [](const std::size_t a, const std::size_t b) {
                               return a + b;
@@ -957,6 +966,18 @@ void testRandomized()
 
 void testManualMy()
 {
+    static_assert(!std::is_copy_assignable<My>::value, "Should not be copy assignable.");
+    static_assert(!std::is_copy_constructible<My>::value, "Should not be copy constructible.");
+    static_assert(std::is_move_assignable<My>::value, "Should be move assignable.");
+    static_assert(std::is_move_constructible<My>::value, "Should be move constructible.");
+    static_assert(std::is_default_constructible<My>::value, "Should be default constructible.");
+
+    static_assert(!std::is_copy_assignable<My::TreeType>::value, "Should not be copy assignable.");
+    static_assert(!std::is_copy_constructible<My::TreeType>::value, "Should not be copy constructible.");
+    static_assert(std::is_move_assignable<My::TreeType>::value, "Should be move assignable.");
+    static_assert(std::is_move_constructible<My::TreeType>::value, "Should be move constructible.");
+    static_assert(std::is_default_constructible<My::TreeType>::value, "Should be default constructible.");
+
     testManual<My>(
         [](const std::uint16_t x) {
             return new My(x);  // NOLINT
@@ -979,6 +1000,7 @@ public:
     using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
+    using Self::getNextInOrderNode;
     using Self::getBalanceFactor;
     using Self::search;
     using Self::remove;
@@ -1001,7 +1023,6 @@ public:
 private:
     using E = struct
     {};
-    UNUSED E root_ptr;
     UNUSED E up;
     UNUSED E lr;
     UNUSED E bf;
@@ -1063,6 +1084,18 @@ auto makeV(const std::uint8_t val) -> V*
 
 void testManualV()
 {
+    static_assert(!std::is_copy_assignable<V>::value, "Should not be copy assignable.");
+    static_assert(!std::is_copy_constructible<V>::value, "Should not be copy constructible.");
+    static_assert(std::is_move_assignable<V>::value, "Should be move assignable.");
+    static_assert(!std::is_move_constructible<V>::value, "Should be move constructible.");
+    static_assert(!std::is_default_constructible<V>::value, "Should be default constructible.");
+
+    static_assert(!std::is_copy_assignable<V::TreeType>::value, "Should not be copy assignable.");
+    static_assert(!std::is_copy_constructible<V::TreeType>::value, "Should not be copy constructible.");
+    static_assert(std::is_move_assignable<V::TreeType>::value, "Should be move assignable.");
+    static_assert(std::is_move_constructible<V::TreeType>::value, "Should be move constructible.");
+    static_assert(std::is_default_constructible<V::TreeType>::value, "Should be default constructible.");
+
     testManual<V>(&makeV<>, [](V* const old_node) {  //
         auto* const new_node = old_node->clone();
         delete old_node;  // NOLINT(*-owning-memory)

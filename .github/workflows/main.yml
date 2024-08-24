@@ -82,9 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DoozyX/clang-format-lint-action@v0.17
+      - uses: DoozyX/clang-format-lint-action@v0.18.1
         with:
           source: '.'
           exclude: './unity'
           extensions: 'c,h,cpp,hpp'
-          clangFormatVersion: 17
+          clangFormatVersion: 18
