@@ -796,7 +796,7 @@ public:
     ///     tree.remove(Node<T>::search(root, search_predicate));
     ///
     /// but it could be done also by direct node removal:
-    /// 
+    ///
     ///     if (auto* const node = Node<T>::search(root, search_predicate) {
     ///         node->remove();
     ///     }
