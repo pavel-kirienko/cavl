@@ -746,7 +746,7 @@ class Tree final  // NOSONAR cpp:S3624
 {
 public:
     /// Helper alias of the compatible node type.
-    using NodeType    = ::cavl::Node<Derived>;
+    using NodeType    = Node<Derived>;
     using DerivedType = Derived;
 
     Tree()  = default;
