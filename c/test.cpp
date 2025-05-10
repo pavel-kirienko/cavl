@@ -1397,6 +1397,44 @@ void test_mutation_randomized()
     }
     print_graphviz(root);
     validate();
+
+    std::puts("Running the traversal test...");
+    std::int16_t last_value = -1;
+    for (N* p = root->min(); p != nullptr; p = reinterpret_cast<N*>(cavl2_next_greater(p))) {
+        TEST_ASSERT_GREATER_THAN(last_value, static_cast<std::int16_t>(p->value));
+        last_value = p->value;
+        std::printf("%u ", static_cast<unsigned>(p->value));
+    }
+    std::puts("");
+}
+
+void test_traversal_full()
+{
+    using N = Node<std::uint8_t>;
+    std::array<N, 256> t{};
+    for (std::size_t i = 0U; i < 256U; i++) {
+        t.at(i).value = static_cast<std::uint8_t>(i);
+    }
+    N* root = nullptr;
+
+    // Add all nodes into the tree in order.
+    for (std::size_t i = 0; i < 256U; i++) {
+        const auto pred = [&](const N& v) { return t[i].value - v.value; };
+        TEST_ASSERT_NULL(find(&root, pred));
+        TEST_ASSERT_EQUAL(&t[i], find_or_insert(&root, pred, [&] { return &t[i]; }));
+        TEST_ASSERT_EQUAL(&t[i], find(&root, pred));
+    }
+
+    // Traverse the tree and ensure we get each node in order.
+    std::int16_t last_value = -1;
+    N*           node       = root->min();
+    TEST_ASSERT_EQUAL(0, node->value);
+    while (node != nullptr) {
+        TEST_ASSERT_EQUAL(last_value + 1, static_cast<std::int16_t>(node->value));
+        last_value = node->value;
+        node       = reinterpret_cast<N*>(cavl2_next_greater(node));
+    }
+    TEST_ASSERT_EQUAL(255, last_value);
 }
 
 } // namespace
@@ -1418,6 +1456,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_removal_a);
     RUN_TEST(test_mutation_manual);
     RUN_TEST(test_mutation_randomized);
+    RUN_TEST(test_traversal_full);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }

@@ -25,6 +25,7 @@
 /// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // ReSharper disable CppCStyleCast CppZeroConstantCanBeReplacedWithNullptr CppTooWideScopeInitStatement
+// ReSharper disable CppRedundantElaboratedTypeSpecifier CppRedundantInlineSpecifier
 #pragma once
 
 #include <stdbool.h>
@@ -58,6 +59,11 @@ extern "C"
 /// The tree node/root. The user data is to be added through composition/inheritance.
 /// The memory layout of this type is compatible with void*[4], which is useful if this type cannot be exposed in API.
 /// Per standard convention, nodes that compare smaller are put on the left.
+/// Usage example:
+///     struct my_user_type_t {
+///         struct cavl2_t base;  ///< Tree node. Should be the first element, otherwise, offsetof() will be needed.
+///         ... user data ...
+///     };
 struct cavl2_t
 {
     struct cavl2_t* up;    ///< Parent node, NULL in the root.
@@ -132,6 +138,32 @@ static inline CAVL2_T* cavl2_extremum(CAVL2_T* const root, const bool maximum)
 static inline CAVL2_T* cavl2_min(CAVL2_T* const root) { return cavl2_extremum(root, false); }
 static inline CAVL2_T* cavl2_max(CAVL2_T* const root) { return cavl2_extremum(root, true);  }
 // clang-format on
+
+/// Returns the next greater node in the in-order traversal of the tree.
+/// Does nothing and returns NULL if the argument is NULL. Behavior undefined if the node is not in the tree.
+/// To use it, first invoke cavl2_min() to get the first node, then call this function repeatedly until it returns NULL:
+///     for (CAVL2_T* p = cavl2_min(root); p != NULL; p = cavl2_next_greater(p)) {
+///         ...
+///     }
+/// The asymptotic complexity for traversing the entire tree is O(n), identical to the traditional recursive traversal.
+static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
+{
+    CAVL2_T* c = NULL;
+    if (node != NULL) {
+        if (node->lr[1] != NULL) {
+            c = cavl2_min(node->lr[1]);
+        } else {
+            const CAVL2_T* n = node;
+            CAVL2_T*       p = node->up;
+            while ((p != NULL) && (p->lr[1] == n)) {
+                n = p;
+                p = p->up;
+            }
+            c = p;
+        }
+    }
+    return c;
+}
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
