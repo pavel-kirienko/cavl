@@ -165,6 +165,13 @@ static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
     return c;
 }
 
+/// The trivial factory is useful in most applications. It simply returns the user pointed converted to CAVL2_T.
+/// It is meant for use with cavl2_find_or_insert().
+static inline CAVL2_T* cavl2_trivial_factory(void* const user)
+{
+    return (CAVL2_T*)user;
+}
+
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 

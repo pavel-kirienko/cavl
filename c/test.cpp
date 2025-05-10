@@ -1437,6 +1437,13 @@ void test_traversal_full()
     TEST_ASSERT_EQUAL(255, last_value);
 }
 
+void test_trivial_factory()
+{
+    Node<std::uint8_t> node{};
+    TEST_ASSERT_EQUAL_PTR(&node, cavl2_trivial_factory(&node));
+    TEST_ASSERT_EQUAL_PTR(NULL, cavl2_trivial_factory(nullptr));
+}
+
 } // namespace
 
 int main(const int argc, const char* const argv[])
@@ -1457,6 +1464,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_mutation_manual);
     RUN_TEST(test_mutation_randomized);
     RUN_TEST(test_traversal_full);
+    RUN_TEST(test_trivial_factory);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
