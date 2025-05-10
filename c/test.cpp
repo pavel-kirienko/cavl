@@ -66,17 +66,17 @@ struct Node final : cavl2_t
 };
 
 /// Wrapper over cavl2_find_or_insert() that supports closures.
-template<typename T, typename Predicate, typename Factory>
-Node<T>* find_or_insert(Node<T>** const root, const Predicate& predicate, const Factory& factory)
+template<typename T, typename Comparator, typename Factory>
+Node<T>* find_or_insert(Node<T>** const root, const Comparator& comparator, const Factory& factory)
 {
     struct Refs
     {
-        Predicate predicate;
-        Factory   factory;
+        Comparator comparator;
+        Factory    factory;
 
-        static std::ptrdiff_t call_predicate(const void* const user, const cavl2_t* const node)
+        static std::ptrdiff_t call_comparator(const void* const user, const cavl2_t* const node)
         {
-            const auto ret = static_cast<const Refs*>(user)->predicate(reinterpret_cast<const Node<T>&>(*node));
+            const auto ret = static_cast<const Refs*>(user)->comparator(reinterpret_cast<const Node<T>&>(*node));
             if (ret > 0) {
                 return 1;
             }
@@ -87,24 +87,24 @@ Node<T>* find_or_insert(Node<T>** const root, const Predicate& predicate, const 
         }
 
         static cavl2_t* call_factory(void* const user) { return static_cast<Refs*>(user)->factory(); }
-    } refs{ predicate, factory };
+    } refs{ comparator, factory };
     cavl2_t* const out = cavl2_find_or_insert(reinterpret_cast<cavl2_t**>(root), //
                                               &refs,
-                                              &Refs::call_predicate,
+                                              &Refs::call_comparator,
                                               &refs,
                                               &Refs::call_factory);
     return reinterpret_cast<Node<T>*>(out);
 }
-template<typename T, typename Predicate>
-Node<T>* find(Node<T>** const root, const Predicate& predicate)
+template<typename T, typename Comparator>
+Node<T>* find(Node<T>** const root, const Comparator& comparator)
 {
     struct Refs
     {
-        Predicate predicate;
+        Comparator comparator;
 
-        static std::ptrdiff_t call_predicate(const void* const user, const cavl2_t* const node)
+        static std::ptrdiff_t call_comparator(const void* const user, const cavl2_t* const node)
         {
-            const auto ret = static_cast<const Refs*>(user)->predicate(reinterpret_cast<const Node<T>&>(*node));
+            const auto ret = static_cast<const Refs*>(user)->comparator(reinterpret_cast<const Node<T>&>(*node));
             if (ret > 0) {
                 return 1;
             }
@@ -113,8 +113,8 @@ Node<T>* find(Node<T>** const root, const Predicate& predicate)
             }
             return 0;
         }
-    } refs{ predicate };
-    cavl2_t* const out = cavl2_find(reinterpret_cast<cavl2_t**>(root), &refs, &Refs::call_predicate);
+    } refs{ comparator };
+    cavl2_t* const out = cavl2_find(reinterpret_cast<cavl2_t**>(root), &refs, &Refs::call_comparator);
     return reinterpret_cast<Node<T>*>(out);
 }
 
@@ -1339,18 +1339,18 @@ void test_mutation_randomized()
     validate();
 
     const auto add = [&](const std::uint8_t x) {
-        const auto predicate = [&](const N& v) { return x - v.value; };
-        if (const N* const existing = find(&root, predicate)) {
+        const auto comparator = [&](const N& v) { return x - v.value; };
+        if (const N* const existing = find(&root, comparator)) {
             TEST_ASSERT_TRUE(mask.at(x));
             TEST_ASSERT_EQUAL(x, existing->value);
-            TEST_ASSERT_EQUAL(x, find_or_insert(&root, predicate, []() -> N* {
+            TEST_ASSERT_EQUAL(x, find_or_insert(&root, comparator, []() -> N* {
                                      TEST_FAIL_MESSAGE("Attempted to create a new node when there is one already");
                                      return nullptr;
                                  })->value);
         } else {
             TEST_ASSERT_FALSE(mask.at(x));
             bool factory_called = false;
-            TEST_ASSERT_EQUAL(x, find_or_insert(&root, predicate, [&]() -> N* {
+            TEST_ASSERT_EQUAL(x, find_or_insert(&root, comparator, [&]() -> N* {
                                      factory_called = true;
                                      return &t.at(x);
                                  })->value);
@@ -1362,15 +1362,15 @@ void test_mutation_randomized()
     };
 
     const auto drop = [&](const std::uint8_t x) {
-        const auto predicate = [&](const N& v) { return x - v.value; };
-        if (const N* const existing = find(&root, predicate)) {
+        const auto comparator = [&](const N& v) { return x - v.value; };
+        if (const N* const existing = find(&root, comparator)) {
             TEST_ASSERT_TRUE(mask.at(x));
             TEST_ASSERT_EQUAL(x, existing->value);
             remove(&root, existing);
             size--;
             cnt_removal++;
             mask.at(x) = false;
-            TEST_ASSERT_NULL(find(&root, predicate));
+            TEST_ASSERT_NULL(find(&root, comparator));
         } else {
             TEST_ASSERT_FALSE(mask.at(x));
         }

@@ -77,40 +77,41 @@ struct cavl2_t
 static_assert(sizeof(CAVL2_T) <= sizeof(void* [4]), "Bad size");
 #endif
 
-/// The predicate result can be overridden to simplify predicate functions.
+/// The comparator result can be overridden to simplify comparator functions.
 /// The type shall be a signed integer type.
-#ifndef CAVL2_PREDICATE_RESULT
-#define CAVL2_PREDICATE_RESULT ptrdiff_t
+/// Only three possible states of the result are considered: negative, zero, and positive; the magnitude is ignored.
+#ifndef CAVL2_RELATION
+#define CAVL2_RELATION ptrdiff_t
 #endif
 /// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
-typedef CAVL2_PREDICATE_RESULT (*cavl2_predicate_t)(const void* user, const CAVL2_T* node);
+typedef CAVL2_RELATION (*cavl2_comparator_t)(const void* user, const CAVL2_T* node);
 
 /// If provided, the factory will be invoked when the sought node does not exist in the tree.
 /// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
 /// If the factory returns NULL or is not provided, the tree is not modified.
 typedef CAVL2_T* (*cavl2_factory_t)(void* user);
 
-/// Look for a node in the tree using the specified search predicate. The worst-case complexity is O(log n).
-/// - If the node is found (i.e., zero predicate), return it.
+/// Look for a node in the tree using the specified comparator. The worst-case complexity is O(log n).
+/// - If the node is found (i.e., zero comparison result), return it.
 /// - If the node is not found and the factory is NULL, return NULL.
 /// - Otherwise, construct a new node using the factory; if the result is not NULL, insert it; return the result.
-/// The user_predicate is passed into the predicate unmodified.
+/// The user_comparator is passed into the comparator unmodified.
 /// The user_factory is passed into the factory unmodified.
 /// The root node may be replaced in the process iff the factory is not NULL and it returns a new node;
 /// otherwise, the root node will not be modified.
-/// If predicate is NULL, returns NULL.
-static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
-                                            const void* const       user_predicate,
-                                            const cavl2_predicate_t predicate,
-                                            void* const             user_factory,
-                                            const cavl2_factory_t   factory);
+/// If comparator is NULL, returns NULL.
+static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const          root,
+                                            const void* const        user_comparator,
+                                            const cavl2_comparator_t comparator,
+                                            void* const              user_factory,
+                                            const cavl2_factory_t    factory);
 
 /// A convenience wrapper over cavl2_find_or_insert() that passes NULL factory, so the tree is never modified.
-static inline CAVL2_T* cavl2_find(CAVL2_T** const         root,
-                                  const void* const       user_predicate,
-                                  const cavl2_predicate_t predicate)
+static inline CAVL2_T* cavl2_find(CAVL2_T** const          root,
+                                  const void* const        user_comparator,
+                                  const cavl2_comparator_t comparator)
 {
-    return cavl2_find_or_insert(root, user_predicate, predicate, NULL, NULL);
+    return cavl2_find_or_insert(root, user_comparator, comparator, NULL, NULL);
 }
 
 /// Remove the specified node from its tree. The root node may be replaced in the process.
@@ -118,7 +119,7 @@ static inline CAVL2_T* cavl2_find(CAVL2_T** const         root,
 /// The function has no effect if either of the pointers are NULL.
 /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
 /// It is safe to pass the result of cavl2_find/cavl2_find_or_insert directly as the second argument:
-///     cavl2_remove(&root, cavl2_find(&root, user, search_predicate));
+///     cavl2_remove(&root, cavl2_find(&root, user, search_comparator));
 /// It is recommended to invalidate the pointers stored in the node after its removal.
 static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node);
 
@@ -264,18 +265,18 @@ static inline CAVL2_T* _cavl2_retrace_on_growth(CAVL2_T* const added)
     return (NULL == p) ? c : NULL; // New root or nothing.
 }
 
-static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
-                                            const void* const       user_predicate,
-                                            const cavl2_predicate_t predicate,
-                                            void* const             user_factory,
-                                            const cavl2_factory_t   factory)
+static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const          root,
+                                            const void* const        user_comparator,
+                                            const cavl2_comparator_t comparator,
+                                            void* const              user_factory,
+                                            const cavl2_factory_t    factory)
 {
     CAVL2_T* out = NULL;
-    if ((root != NULL) && (predicate != NULL)) {
+    if ((root != NULL) && (comparator != NULL)) {
         CAVL2_T*  up = *root;
         CAVL2_T** n  = root;
         while (*n != NULL) {
-            const CAVL2_PREDICATE_RESULT cmp = predicate(user_predicate, *n);
+            const CAVL2_RELATION cmp = comparator(user_comparator, *n);
             if (0 == cmp) {
                 out = *n;
                 break;
