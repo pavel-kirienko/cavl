@@ -1,13 +1,13 @@
 name: Main Workflow
 
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 jobs:
   debug:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        toolchain: ['clang', 'gcc']
+        toolchain: [ 'clang', 'gcc' ]
         include:
           - toolchain: gcc
             c-compiler: gcc
@@ -45,8 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        toolchain: ['clang', 'gcc']
-        build_type: [Release, MinSizeRel]
+        toolchain: [ 'clang', 'gcc' ]
+        build_type: [ Release, MinSizeRel ]
         include:
           - toolchain: gcc
             c-compiler: gcc
@@ -82,9 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DoozyX/clang-format-lint-action@v0.18.1
+      - uses: DoozyX/clang-format-lint-action@v0.20
         with:
           source: '.'
           exclude: './unity'
           extensions: 'c,h,cpp,hpp'
-          clangFormatVersion: 18
+          clangFormatVersion: 20
