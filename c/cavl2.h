@@ -9,6 +9,22 @@
 /// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
 /// high-integrity embedded systems.
 ///
+/// Version history:
+///
+/// - v1.0: initial release.
+/// - v2.0:
+///   - Simplify the API and improve naming.
+///   - The header file now bears the major version number, which simplifies vendoring: a project now can safely
+///     depend on cavl without the risk of version compatibility issues.
+///   - For the same reason as above, all definitions are now prefixed with cavl2 instead of cavl.
+///   - Add optional CAVL2_T macro to allow overriding the cavl2_t type. This is needed for libudpard/libcanard/etc
+///     and is generally useful because it allows library vendors to avoid exposing cavl via the library API.
+///     Also add CAVL2_RELATION to simplify comparator implementations.
+///   - Add the trivial factory definition because it is needed in nearly every application using cavl.
+///   - New traversal function cavl2_next_greater() offering the same time complexity but without recursion/callbacks.
+///
+/// -------------------------------------------------------------------------------------------------------------------
+///
 /// Copyright (c) Pavel Kirienko <pavel@opencyphal.org>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
