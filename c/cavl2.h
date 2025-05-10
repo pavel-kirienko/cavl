@@ -1,0 +1,334 @@
+/// Source: https://github.com/pavel-kirienko/cavl
+///
+/// Cavl is a single-header C library providing an implementation of AVL tree suitable for deeply embedded systems.
+/// To integrate it into your project, simply copy this file into your source tree.
+/// You can define build option macros before including the header to customize the behavior.
+/// All definitions are prefixed with cavl2 to avoid collisions with other major versions of the library.
+/// Read the API docs below.
+///
+/// See also O1Heap <https://github.com/pavel-kirienko/o1heap> -- a deterministic memory manager for hard-real-time
+/// high-integrity embedded systems.
+///
+/// Copyright (c) Pavel Kirienko <pavel@opencyphal.org>
+///
+/// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+/// documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+/// the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+/// and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+///
+/// The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+/// the Software.
+///
+/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+/// WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
+/// OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+/// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// ReSharper disable CppCStyleCast CppZeroConstantCanBeReplacedWithNullptr CppTooWideScopeInitStatement
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+/// If Cavl is used in throughput-critical code, then it is recommended to disable assertion checks as they may
+/// be costly in terms of execution time.
+#ifndef CAVL2_ASSERT
+#if defined(CAVL2_NO_ASSERT) && CAVL2_NO_ASSERT
+#define CAVL2_ASSERT(x) (void)0
+#else
+#include <assert.h>
+#define CAVL2_ASSERT(x) assert(x)
+#endif
+#endif
+
+#ifdef __cplusplus
+// This is, strictly speaking, useless because we do not define any functions with external linkage here,
+// but it tells static analyzers that what follows should be interpreted as C code rather than C++.
+extern "C"
+{
+#endif
+
+// ----------------------------------------         PUBLIC API SECTION         ----------------------------------------
+
+/// CAVL2_T can be defined before including this header to provide a custom struct type for the node element.
+/// The custom type must have the same fields as the default struct cavl2_t.
+/// This option is useful if Cavl is integrated into a library without exposing it through the library API.
+#ifndef CAVL2_T
+/// The tree node/root. The user data is to be added through composition/inheritance.
+/// The memory layout of this type is compatible with void*[4], which is useful if this type cannot be exposed in API.
+/// Per standard convention, nodes that compare smaller are put on the left.
+struct cavl2_t
+{
+    struct cavl2_t* up;    ///< Parent node, NULL in the root.
+    struct cavl2_t* lr[2]; ///< Left child (lesser), right child (greater).
+    int_fast8_t     bf;    ///< Balance factor is positive when right-heavy. Allowed values are {-1, 0, +1}.
+};
+#define CAVL2_T struct cavl2_t
+#endif
+
+#if defined(static_assert) || defined(__cplusplus)
+static_assert(sizeof(CAVL2_T) <= sizeof(void* [4]), "Bad size");
+#endif
+
+/// The predicate result can be overridden to simplify predicate functions.
+/// The type shall be a signed integer type.
+#ifndef CAVL2_PREDICATE_RESULT
+#define CAVL2_PREDICATE_RESULT ptrdiff_t
+#endif
+/// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
+typedef CAVL2_PREDICATE_RESULT (*cavl2_predicate_t)(void* user, const CAVL2_T* node);
+
+/// If provided, the factory will be invoked when the sought node does not exist in the tree.
+/// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
+/// If the factory returns NULL or is not provided, the tree is not modified.
+typedef CAVL2_T* (*cavl2_factory_t)(void* user);
+
+/// Look for a node in the tree using the specified search predicate. The worst-case complexity is O(log n).
+/// - If the node is found (i.e., zero predicate), return it.
+/// - If the node is not found and the factory is NULL, return NULL.
+/// - Otherwise, construct a new node using the factory; if the result is not NULL, insert it; return the result.
+/// The user_predicate is passed into the predicate unmodified.
+/// The user_factory is passed into the factory unmodified.
+/// The root node may be replaced in the process iff the factory is not NULL and it returns a new node;
+/// otherwise, the root node will not be modified.
+/// If predicate is NULL, returns NULL.
+static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
+                                            void* const             user_predicate,
+                                            void* const             user_factory,
+                                            const cavl2_predicate_t predicate,
+                                            const cavl2_factory_t   factory);
+
+/// A convenience wrapper over cavl2_find_or_insert() that passes NULL factory, so the tree is never modified.
+static inline CAVL2_T* cavl2_find(CAVL2_T** const root, void* const user_predicate, const cavl2_predicate_t predicate)
+{
+    return cavl2_find_or_insert(root, user_predicate, NULL, predicate, NULL);
+}
+
+/// Remove the specified node from its tree. The root node may be replaced in the process.
+/// The worst-case complexity is O(log n).
+/// The function has no effect if either of the pointers are NULL.
+/// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
+/// It is safe to pass the result of cavl2_find/cavl2_find_or_insert directly as the second argument:
+///     cavl2_remove(&root, cavl2_find(&root, user, search_predicate));
+/// It is recommended to invalidate the pointers stored in the node after its removal.
+static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node);
+
+/// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
+/// Returns NULL iff the argument is NULL (i.e., the tree is empty). The worst-case complexity is O(log n).
+static inline CAVL2_T* cavl2_extremum(CAVL2_T* const root, const bool maximum)
+{
+    CAVL2_T* result = NULL;
+    CAVL2_T* c      = root;
+    while (c != NULL) {
+        result = c;
+        c      = c->lr[maximum];
+    }
+    return result;
+}
+
+// ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
+// ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
+
+/// INTERNAL USE ONLY. Makes the '!r' child of node 'x' its parent; i.e., rotates 'x' toward 'r'.
+static inline void _cavl2_rotate(CAVL2_T* const x, const bool r)
+{
+    CAVL2_ASSERT((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
+    CAVL2_T* const z = x->lr[!r];
+    if (x->up != NULL) {
+        x->up->lr[x->up->lr[1] == x] = z;
+    }
+    z->up     = x->up;
+    x->up     = z;
+    x->lr[!r] = z->lr[r];
+    if (x->lr[!r] != NULL) {
+        x->lr[!r]->up = x;
+    }
+    z->lr[r] = x;
+}
+
+/// INTERNAL USE ONLY.
+/// Accepts a node and how its balance factor needs to be changed -- either +1 or -1.
+/// Returns the new node to replace the old one if tree rotation took place, same node otherwise.
+static inline CAVL2_T* _cavl2_adjust_balance(CAVL2_T* const x, const bool increment)
+{
+    CAVL2_ASSERT((x != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
+    CAVL2_T*          out    = x;
+    const int_fast8_t new_bf = (int_fast8_t)(x->bf + (increment ? +1 : -1));
+    if ((new_bf < -1) || (new_bf > 1)) {
+        const bool        r    = new_bf < 0;  // bf<0 if left-heavy --> right rotation is needed.
+        const int_fast8_t sign = r ? +1 : -1; // Positive if we are rotating right.
+        CAVL2_T* const    z    = x->lr[!r];
+        CAVL2_ASSERT(z != NULL);   // Heavy side cannot be empty.  NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
+        if ((z->bf * sign) <= 0) { // Parent and child are heavy on the same side or the child is balanced.
+            out = z;
+            _cavl2_rotate(x, r);
+            if (0 == z->bf) {
+                x->bf = (int_fast8_t)(-sign);
+                z->bf = (int_fast8_t)(+sign);
+            } else {
+                x->bf = 0;
+                z->bf = 0;
+            }
+        } else { // Otherwise, the child needs to be rotated in the opposite direction first.
+            CAVL2_T* const y = z->lr[r];
+            CAVL2_ASSERT(y != NULL); // Heavy side cannot be empty.
+            out = y;
+            _cavl2_rotate(z, !r);
+            _cavl2_rotate(x, r);
+            if ((y->bf * sign) < 0) {
+                x->bf = (int_fast8_t)(+sign);
+                y->bf = 0;
+                z->bf = 0;
+            } else if ((y->bf * sign) > 0) {
+                x->bf = 0;
+                y->bf = 0;
+                z->bf = (int_fast8_t)(-sign);
+            } else {
+                x->bf = 0;
+                z->bf = 0;
+            }
+        }
+    } else {
+        x->bf = new_bf; // Balancing not needed, just update the balance factor and call it a day.
+    }
+    return out;
+}
+
+/// INTERNAL USE ONLY.
+/// Takes the culprit node (the one that is added); returns NULL or the root of the tree (possibly new one).
+/// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
+static inline CAVL2_T* _cavl2_retrace_on_growth(CAVL2_T* const added)
+{
+    CAVL2_ASSERT((added != NULL) && (0 == added->bf));
+    CAVL2_T* c = added;     // Child
+    CAVL2_T* p = added->up; // Parent
+    while (p != NULL) {
+        const bool r = p->lr[1] == c; // c is the right child of parent
+        CAVL2_ASSERT(p->lr[r] == c);
+        c = _cavl2_adjust_balance(p, r);
+        p = c->up;
+        if (0 ==
+            c->bf) { // The height change of the subtree made this parent perfectly balanced (as all things should be),
+            break;   // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
+        }
+    }
+    CAVL2_ASSERT(c != NULL);
+    return (NULL == p) ? c : NULL; // New root or nothing.
+}
+
+static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
+                                            void* const             user_predicate,
+                                            void* const             user_factory,
+                                            const cavl2_predicate_t predicate,
+                                            const cavl2_factory_t   factory)
+{
+    CAVL2_T* out = NULL;
+    if ((root != NULL) && (predicate != NULL)) {
+        CAVL2_T*  up = *root;
+        CAVL2_T** n  = root;
+        while (*n != NULL) {
+            const CAVL2_PREDICATE_RESULT cmp = predicate(user_predicate, *n);
+            if (0 == cmp) {
+                out = *n;
+                break;
+            }
+            up = *n;
+            n  = &(*n)->lr[cmp > 0];
+            CAVL2_ASSERT((NULL == *n) || ((*n)->up == up));
+        }
+        if (NULL == out) {
+            out = (NULL == factory) ? NULL : factory(user_factory);
+            if (out != NULL) {
+                *n                = out; // Overwrite the pointer to the new node in the parent node.
+                out->lr[0]        = NULL;
+                out->lr[1]        = NULL;
+                out->up           = up;
+                out->bf           = 0;
+                CAVL2_T* const rt = _cavl2_retrace_on_growth(out);
+                if (rt != NULL) {
+                    *root = rt;
+                }
+            }
+        }
+    }
+    return out;
+}
+
+static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node)
+{
+    if ((root != NULL) && (node != NULL)) {
+        CAVL2_ASSERT(*root != NULL); // Otherwise, the node would have to be NULL.
+        CAVL2_ASSERT((node->up != NULL) || (node == *root));
+        CAVL2_T* p = NULL;  // The lowest parent node that suffered a shortening of its subtree.
+        bool     r = false; // Which side of the above was shortened.
+        // The first step is to update the topology and remember the node where to start the retracing from later.
+        // Balancing is not performed yet so we may end up with an unbalanced tree.
+        if ((node->lr[0] != NULL) && (node->lr[1] != NULL)) {
+            CAVL2_T* const re = cavl2_extremum(node->lr[1], false);
+            CAVL2_ASSERT((re != NULL) && (NULL == re->lr[0]) && (re->up != NULL));
+            re->bf        = node->bf;
+            re->lr[0]     = node->lr[0];
+            re->lr[0]->up = re;
+            if (re->up != node) {
+                p = re->up; // Retracing starts with the ex-parent of our replacement node.
+                CAVL2_ASSERT(p->lr[0] == re);
+                p->lr[0] = re->lr[1]; // Reducing the height of the left subtree here.
+                if (p->lr[0] != NULL) {
+                    p->lr[0]->up = p;
+                }
+                re->lr[1]     = node->lr[1];
+                re->lr[1]->up = re;
+                r             = false;
+            } else // In this case, we are reducing the height of the right subtree, so r=1.
+            {
+                p = re;   // Retracing starts with the replacement node itself as we are deleting its parent.
+                r = true; // The right child of the replacement node remains the same so we don't bother relinking it.
+            }
+            re->up = node->up;
+            if (re->up != NULL) {
+                re->up->lr[re->up->lr[1] == node] = re; // Replace link in the parent of node.
+            } else {
+                *root = re;
+            }
+        } else { // Either or both of the children are NULL.
+            p             = node->up;
+            const bool rr = node->lr[1] != NULL;
+            if (node->lr[rr] != NULL) {
+                node->lr[rr]->up = p;
+            }
+            if (p != NULL) {
+                r        = p->lr[1] == node;
+                p->lr[r] = node->lr[rr];
+                if (p->lr[r] != NULL) {
+                    p->lr[r]->up = p;
+                }
+            } else {
+                *root = node->lr[rr];
+            }
+        }
+        // Now that the topology is updated, perform the retracing to restore balance. We climb up adjusting the
+        // balance factors until we reach the root or a parent whose balance factor becomes plus/minus one, which
+        // means that that parent was able to absorb the balance delta; in other words, the height of the outer
+        // subtree is unchanged, so upper balance factors shall be kept unchanged.
+        if (p != NULL) {
+            CAVL2_T* c = NULL;
+            for (;;) {
+                c = _cavl2_adjust_balance(p, !r);
+                p = c->up;
+                if ((c->bf != 0) || (NULL == p)) { // Reached the root or the height difference is absorbed by c.
+                    break;
+                }
+                r = p->lr[1] == c;
+            }
+            if (NULL == p) {
+                CAVL2_ASSERT(c != NULL);
+                *root = c;
+            }
+        }
+    }
+}
+
+#ifdef __cplusplus
+}
+#endif

@@ -41,11 +41,11 @@ Checks: >-
   -cppcoreguidelines-pro-type-vararg,
   -*-avoid-c-arrays,
   -*-no-malloc,
+  -boost*,
   -misc-no-recursion,
   -cert-msc30-c,
   -cert-msc50-cpp,
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*\.hpp'
-AnalyzeTemporaryDtors: false
 FormatStyle: file
 ...
