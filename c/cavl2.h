@@ -127,6 +127,12 @@ static inline CAVL2_T* cavl2_extremum(CAVL2_T* const root, const bool maximum)
     return result;
 }
 
+// clang-format off
+/// Convenience wrappers for cavl2_extremum().
+static inline CAVL2_T* cavl2_min(CAVL2_T* const root) { return cavl2_extremum(root, false); }
+static inline CAVL2_T* cavl2_max(CAVL2_T* const root) { return cavl2_extremum(root, true);  }
+// clang-format on
+
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 

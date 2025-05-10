@@ -55,8 +55,8 @@ struct Node final : cavl2_t
                ((check_ri == nullptr) || (check_ri->up == this));
     }
 
-    Node* min() { return reinterpret_cast<Node*>(cavl2_extremum(this, false)); }
-    Node* max() { return reinterpret_cast<Node*>(cavl2_extremum(this, true)); }
+    Node* min() { return reinterpret_cast<Node*>(cavl2_min(this)); }
+    Node* max() { return reinterpret_cast<Node*>(cavl2_max(this)); }
 
     Node& operator=(const cavl2_t& cv)
     {
