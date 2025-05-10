@@ -74,9 +74,9 @@ Node<T>* find_or_insert(Node<T>** const root, const Predicate& predicate, const 
         Predicate predicate;
         Factory   factory;
 
-        static std::ptrdiff_t call_predicate(void* const user_reference, const cavl2_t* const node)
+        static std::ptrdiff_t call_predicate(const void* const user, const cavl2_t* const node)
         {
-            const auto ret = static_cast<Refs*>(user_reference)->predicate(reinterpret_cast<const Node<T>&>(*node));
+            const auto ret = static_cast<const Refs*>(user)->predicate(reinterpret_cast<const Node<T>&>(*node));
             if (ret > 0) {
                 return 1;
             }
@@ -86,13 +86,13 @@ Node<T>* find_or_insert(Node<T>** const root, const Predicate& predicate, const 
             return 0;
         }
 
-        static cavl2_t* call_factory(void* const user_reference)
-        {
-            return static_cast<Refs*>(user_reference)->factory();
-        }
+        static cavl2_t* call_factory(void* const user) { return static_cast<Refs*>(user)->factory(); }
     } refs{ predicate, factory };
-    cavl2_t* const out =
-      cavl2_find_or_insert(reinterpret_cast<cavl2_t**>(root), &refs, &refs, &Refs::call_predicate, &Refs::call_factory);
+    cavl2_t* const out = cavl2_find_or_insert(reinterpret_cast<cavl2_t**>(root), //
+                                              &refs,
+                                              &Refs::call_predicate,
+                                              &refs,
+                                              &Refs::call_factory);
     return reinterpret_cast<Node<T>*>(out);
 }
 template<typename T, typename Predicate>
@@ -102,9 +102,9 @@ Node<T>* find(Node<T>** const root, const Predicate& predicate)
     {
         Predicate predicate;
 
-        static std::ptrdiff_t call_predicate(void* const user_reference, const cavl2_t* const node)
+        static std::ptrdiff_t call_predicate(const void* const user, const cavl2_t* const node)
         {
-            const auto ret = static_cast<Refs*>(user_reference)->predicate(reinterpret_cast<const Node<T>&>(*node));
+            const auto ret = static_cast<const Refs*>(user)->predicate(reinterpret_cast<const Node<T>&>(*node));
             if (ret > 0) {
                 return 1;
             }

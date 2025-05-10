@@ -83,7 +83,7 @@ static_assert(sizeof(CAVL2_T) <= sizeof(void* [4]), "Bad size");
 #define CAVL2_PREDICATE_RESULT ptrdiff_t
 #endif
 /// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
-typedef CAVL2_PREDICATE_RESULT (*cavl2_predicate_t)(void* user, const CAVL2_T* node);
+typedef CAVL2_PREDICATE_RESULT (*cavl2_predicate_t)(const void* user, const CAVL2_T* node);
 
 /// If provided, the factory will be invoked when the sought node does not exist in the tree.
 /// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
@@ -100,15 +100,17 @@ typedef CAVL2_T* (*cavl2_factory_t)(void* user);
 /// otherwise, the root node will not be modified.
 /// If predicate is NULL, returns NULL.
 static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
-                                            void* const             user_predicate,
-                                            void* const             user_factory,
+                                            const void* const       user_predicate,
                                             const cavl2_predicate_t predicate,
+                                            void* const             user_factory,
                                             const cavl2_factory_t   factory);
 
 /// A convenience wrapper over cavl2_find_or_insert() that passes NULL factory, so the tree is never modified.
-static inline CAVL2_T* cavl2_find(CAVL2_T** const root, void* const user_predicate, const cavl2_predicate_t predicate)
+static inline CAVL2_T* cavl2_find(CAVL2_T** const         root,
+                                  const void* const       user_predicate,
+                                  const cavl2_predicate_t predicate)
 {
-    return cavl2_find_or_insert(root, user_predicate, NULL, predicate, NULL);
+    return cavl2_find_or_insert(root, user_predicate, predicate, NULL, NULL);
 }
 
 /// Remove the specified node from its tree. The root node may be replaced in the process.
@@ -263,9 +265,9 @@ static inline CAVL2_T* _cavl2_retrace_on_growth(CAVL2_T* const added)
 }
 
 static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const         root,
-                                            void* const             user_predicate,
-                                            void* const             user_factory,
+                                            const void* const       user_predicate,
                                             const cavl2_predicate_t predicate,
+                                            void* const             user_factory,
                                             const cavl2_factory_t   factory)
 {
     CAVL2_T* out = NULL;
