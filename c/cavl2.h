@@ -123,11 +123,10 @@ static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const          root,
                                             const cavl2_factory_t    factory);
 
 /// A convenience wrapper over cavl2_find_or_insert() that passes NULL factory, so the tree is never modified.
-static inline CAVL2_T* cavl2_find(CAVL2_T** const          root,
-                                  const void* const        user_comparator,
-                                  const cavl2_comparator_t comparator)
+/// Since the tree is not modified, the root pointer is passed by value, unlike in the mutating version.
+static inline CAVL2_T* cavl2_find(CAVL2_T* root, const void* const user_comparator, const cavl2_comparator_t comparator)
 {
-    return cavl2_find_or_insert(root, user_comparator, comparator, NULL, NULL);
+    return cavl2_find_or_insert(&root, user_comparator, comparator, NULL, NULL);
 }
 
 /// Remove the specified node from its tree. The root node may be replaced in the process.
@@ -190,6 +189,28 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
 {
     return (CAVL2_T*)user;
 }
+
+/// A convenience macro for use when a struct is a member of multiple AVL trees. For example:
+///
+///     struct my_type_t {
+///         struct cavl2_t tree_a;
+///         struct cavl2_t tree_b;
+///         ...
+///     };
+///
+/// If we only have tree_a, we don't need this helper because the C standard guarantees that the address of a struct
+/// equals the address of its first member, always, so simply casting a tree node to (struct my_type_t*) yields
+/// a valid pointer to the struct. However, if we have more than one tree nodes in a struct, for the other ones
+/// we will need to subtract the offset of the tree node field from the address of the tree node to get to the owner.
+/// This macro does exactly that. Example:
+///
+///     struct cavl2_t* tree_node_b = cavl2_find(...);  // whatever
+///     if (tree_node_b == NULL) { ... }                // do something else
+///     struct my_type_t* my_struct = CAVL2_TO_OWNER(tree_node_b, struct my_type_t, tree_b);
+///
+/// The result is undefined if the tree_node_ptr is not a valid pointer to the tree node. Check for NULL first.
+#define CAVL2_TO_OWNER(tree_node_ptr, owner_type, owner_tree_node_field)                                     \
+    ((owner_type*)(void*)(((char*)(tree_node_ptr)) - offsetof(owner_type, owner_tree_node_field))) // NOLINT
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------

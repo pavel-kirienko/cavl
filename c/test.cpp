@@ -96,7 +96,7 @@ Node<T>* find_or_insert(Node<T>** const root, const Comparator& comparator, cons
     return reinterpret_cast<Node<T>*>(out);
 }
 template<typename T, typename Comparator>
-Node<T>* find(Node<T>** const root, const Comparator& comparator)
+Node<T>* find(Node<T>* const root, const Comparator& comparator)
 {
     struct Refs
     {
@@ -114,7 +114,7 @@ Node<T>* find(Node<T>** const root, const Comparator& comparator)
             return 0;
         }
     } refs{ comparator };
-    cavl2_t* const out = cavl2_find(reinterpret_cast<cavl2_t**>(root), &refs, &Refs::call_comparator);
+    cavl2_t* const out = cavl2_find(reinterpret_cast<cavl2_t*>(root), &refs, &Refs::call_comparator);
     return reinterpret_cast<Node<T>*>(out);
 }
 
@@ -700,10 +700,10 @@ void test_find_trivial()
     // Bad arguments:
     TEST_ASSERT_NULL(cavl2_find_or_insert(reinterpret_cast<cavl2_t**>(&root), nullptr, nullptr, nullptr, nullptr));
     TEST_ASSERT_EQUAL(&a, root);
-    TEST_ASSERT_NULL(find(&root, [&](const N& v) { return q.value - v.value; }));
+    TEST_ASSERT_NULL(find(root, [&](const N& v) { return q.value - v.value; }));
     TEST_ASSERT_EQUAL(&a, root);
-    TEST_ASSERT_EQUAL(&e, find(&root, [&](const N& v) { return e.value - v.value; }));
-    TEST_ASSERT_EQUAL(&b, find(&root, [&](const N& v) { return b.value - v.value; }));
+    TEST_ASSERT_EQUAL(&e, find(root, [&](const N& v) { return e.value - v.value; }));
+    TEST_ASSERT_EQUAL(&b, find(root, [&](const N& v) { return b.value - v.value; }));
     TEST_ASSERT_EQUAL(&a, root);
     print(&a);
     TEST_ASSERT_EQUAL(nullptr, cavl2_extremum(nullptr, true));
@@ -1057,9 +1057,9 @@ void test_mutation_manual()
     N* root = nullptr;
     for (std::uint8_t i = 1; i < 32; i++) {
         const auto pred = [&](const N& v) { return t[i].value - v.value; };
-        TEST_ASSERT_NULL(find(&root, pred));
+        TEST_ASSERT_NULL(find(root, pred));
         TEST_ASSERT_EQUAL(&t[i], find_or_insert(&root, pred, [&]() { return &t[i]; }));
-        TEST_ASSERT_EQUAL(&t[i], find(&root, pred));
+        TEST_ASSERT_EQUAL(&t[i], find(root, pred));
         // Validate the tree after every mutation.
         TEST_ASSERT_NOT_NULL(root);
         TEST_ASSERT_NULL(find_broken_bf(root));
@@ -1340,7 +1340,7 @@ void test_mutation_randomized()
 
     const auto add = [&](const std::uint8_t x) {
         const auto comparator = [&](const N& v) { return x - v.value; };
-        if (const N* const existing = find(&root, comparator)) {
+        if (const N* const existing = find(root, comparator)) {
             TEST_ASSERT_TRUE(mask.at(x));
             TEST_ASSERT_EQUAL(x, existing->value);
             TEST_ASSERT_EQUAL(x, find_or_insert(&root, comparator, []() -> N* {
@@ -1363,14 +1363,14 @@ void test_mutation_randomized()
 
     const auto drop = [&](const std::uint8_t x) {
         const auto comparator = [&](const N& v) { return x - v.value; };
-        if (const N* const existing = find(&root, comparator)) {
+        if (const N* const existing = find(root, comparator)) {
             TEST_ASSERT_TRUE(mask.at(x));
             TEST_ASSERT_EQUAL(x, existing->value);
             remove(&root, existing);
             size--;
             cnt_removal++;
             mask.at(x) = false;
-            TEST_ASSERT_NULL(find(&root, comparator));
+            TEST_ASSERT_NULL(find(root, comparator));
         } else {
             TEST_ASSERT_FALSE(mask.at(x));
         }
@@ -1420,9 +1420,9 @@ void test_traversal_full()
     // Add all nodes into the tree in order.
     for (std::size_t i = 0; i < 256U; i++) {
         const auto pred = [&](const N& v) { return t[i].value - v.value; };
-        TEST_ASSERT_NULL(find(&root, pred));
+        TEST_ASSERT_NULL(find(root, pred));
         TEST_ASSERT_EQUAL(&t[i], find_or_insert(&root, pred, [&] { return &t[i]; }));
-        TEST_ASSERT_EQUAL(&t[i], find(&root, pred));
+        TEST_ASSERT_EQUAL(&t[i], find(root, pred));
     }
 
     // Traverse the tree and ensure we get each node in order.
@@ -1442,6 +1442,22 @@ void test_trivial_factory()
     Node<std::uint8_t> node{};
     TEST_ASSERT_EQUAL_PTR(&node, cavl2_trivial_factory(&node));
     TEST_ASSERT_EQUAL_PTR(NULL, cavl2_trivial_factory(nullptr));
+}
+
+void test_to_owner()
+{
+    struct foo
+    {
+        cavl2_t tree_a;
+        int     a;
+        cavl2_t tree_b;
+        char    b;
+        cavl2_t tree_c;
+    };
+    foo f{};
+    TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_a, foo, tree_a));
+    TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_b, foo, tree_b));
+    TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_c, foo, tree_c));
 }
 
 } // namespace
@@ -1465,6 +1481,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_mutation_randomized);
     RUN_TEST(test_traversal_full);
     RUN_TEST(test_trivial_factory);
+    RUN_TEST(test_to_owner);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
