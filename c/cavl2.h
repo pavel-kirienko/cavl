@@ -208,9 +208,11 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
 ///     if (tree_node_b == NULL) { ... }                // do something else
 ///     struct my_type_t* my_struct = CAVL2_TO_OWNER(tree_node_b, struct my_type_t, tree_b);
 ///
-/// The result is undefined if the tree_node_ptr is not a valid pointer to the tree node. Check for NULL first.
-#define CAVL2_TO_OWNER(tree_node_ptr, owner_type, owner_tree_node_field)                                     \
-    ((owner_type*)(void*)(((char*)(tree_node_ptr)) - offsetof(owner_type, owner_tree_node_field))) // NOLINT
+/// The result is undefined if the tree_node_ptr is not a valid pointer to the tree node.
+#define CAVL2_TO_OWNER(tree_node_ptr, owner_type, owner_tree_node_field) \
+    (((tree_node_ptr) == NULL)                                           \
+         ? NULL                                                          \
+         : ((owner_type*) (void*) (((char*) (tree_node_ptr)) - offsetof(owner_type, owner_tree_node_field))))  // NOLINT
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
