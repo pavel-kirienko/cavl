@@ -216,8 +216,7 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
 /// INTERNAL USE ONLY.
-static inline void* _cavl2_to_owner_helper(void* const  tree_node_ptr, //
-                                           const size_t offset)
+static inline void* _cavl2_to_owner_helper(const void* const tree_node_ptr, const size_t offset)
 {
     return (tree_node_ptr == NULL) ? NULL : (void*)((char*)tree_node_ptr - offset);
 }
