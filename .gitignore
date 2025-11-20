@@ -49,3 +49,4 @@ __pycache__/
 
 # Dumb OS crap
 .DS_Store
+_codeql*

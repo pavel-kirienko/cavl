@@ -1458,6 +1458,25 @@ void test_to_owner()
     TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_a, foo, tree_a));
     TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_b, foo, tree_b));
     TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(&f.tree_c, foo, tree_c));
+
+    // Test that the macro doesn't evaluate the pointer expression twice.
+    // If it did, call_count would be 2 instead of 1.
+    int  call_count    = 0;
+    auto get_tree_node = [&call_count, &f]() -> cavl2_t* {
+        call_count++;
+        return &f.tree_b;
+    };
+    TEST_ASSERT_EQUAL_PTR(&f, CAVL2_TO_OWNER(get_tree_node(), foo, tree_b));
+    TEST_ASSERT_EQUAL_INT(1, call_count);
+
+    // Test with NULL return
+    call_count         = 0;
+    auto get_null_node = [&call_count]() -> cavl2_t* {
+        call_count++;
+        return nullptr;
+    };
+    TEST_ASSERT_EQUAL_PTR(NULL, CAVL2_TO_OWNER(get_null_node(), foo, tree_b));
+    TEST_ASSERT_EQUAL_INT(1, call_count);
 }
 
 } // namespace
