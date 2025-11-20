@@ -192,7 +192,8 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
 
 /// Helper function for CAVL2_TO_OWNER that performs the offset calculation without evaluating the pointer twice.
 /// This is an internal implementation detail; use the CAVL2_TO_OWNER macro instead of calling this directly.
-static inline void* _cavl2_to_owner_helper(void* const tree_node_ptr, const size_t offset)
+static inline void* _cavl2_to_owner_helper(void* const  tree_node_ptr,  //
+                                            const size_t offset)
 {
     return (tree_node_ptr == NULL) ? NULL : (void*)((char*)tree_node_ptr - offset);
 }
