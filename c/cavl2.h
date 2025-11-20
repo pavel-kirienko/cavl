@@ -190,14 +190,6 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
     return (CAVL2_T*)user;
 }
 
-/// Helper function for CAVL2_TO_OWNER that performs the offset calculation without evaluating the pointer twice.
-/// This is an internal implementation detail; use the CAVL2_TO_OWNER macro instead of calling this directly.
-static inline void* _cavl2_to_owner_helper(void* const  tree_node_ptr, //
-                                           const size_t offset)
-{
-    return (tree_node_ptr == NULL) ? NULL : (void*)((char*)tree_node_ptr - offset);
-}
-
 /// A convenience macro for use when a struct is a member of multiple AVL trees. For example:
 ///
 ///     struct my_type_t {
@@ -222,6 +214,13 @@ static inline void* _cavl2_to_owner_helper(void* const  tree_node_ptr, //
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
+
+/// INTERNAL USE ONLY.
+static inline void* _cavl2_to_owner_helper(void* const  tree_node_ptr, //
+                                           const size_t offset)
+{
+    return (tree_node_ptr == NULL) ? NULL : (void*)((char*)tree_node_ptr - offset);
+}
 
 /// INTERNAL USE ONLY. Makes the '!r' child of node 'x' its parent; i.e., rotates 'x' toward 'r'.
 static inline void _cavl2_rotate(CAVL2_T* const x, const bool r)
