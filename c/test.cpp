@@ -1461,7 +1461,7 @@ void test_to_owner()
 
     // Test that the macro doesn't evaluate the pointer expression twice.
     // If it did, call_count would be 2 instead of 1.
-    int call_count = 0;
+    int  call_count    = 0;
     auto get_tree_node = [&call_count, &f]() -> cavl2_t* {
         call_count++;
         return &f.tree_b;
@@ -1470,7 +1470,7 @@ void test_to_owner()
     TEST_ASSERT_EQUAL_INT(1, call_count);
 
     // Test with NULL return
-    call_count = 0;
+    call_count         = 0;
     auto get_null_node = [&call_count]() -> cavl2_t* {
         call_count++;
         return nullptr;
