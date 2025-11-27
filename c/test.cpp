@@ -120,7 +120,7 @@ Node<T>* find(Node<T>* const root, const Comparator& comparator)
 
 /// Wrapper over cavl2_remove().
 template<typename T>
-void remove(Node<T>** const root, const Node<T>* const n)
+void remove(Node<T>** const root, Node<T>* const n)
 {
     cavl2_remove(reinterpret_cast<cavl2_t**>(root), n);
 }
@@ -1363,7 +1363,7 @@ void test_mutation_randomized()
 
     const auto drop = [&](const std::uint8_t x) {
         const auto comparator = [&](const N& v) { return x - v.value; };
-        if (const N* const existing = find(root, comparator)) {
+        if (N* const existing = find(root, comparator)) {
             TEST_ASSERT_TRUE(mask.at(x));
             TEST_ASSERT_EQUAL(x, existing->value);
             remove(&root, existing);
@@ -1479,6 +1479,65 @@ void test_to_owner()
     TEST_ASSERT_EQUAL_INT(1, call_count);
 }
 
+void test_is_inserted()
+{
+    using N = Node<std::uint8_t>;
+    N t[10]{};
+    for (std::uint8_t i = 0; i < 10; i++) {
+        t[i].value = i;
+    }
+    N* root = nullptr;
+
+    // When root is NULL and node has all NULL pointers, it's not inserted.
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[1]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[2]));
+
+    // Insert a single node (it becomes the root).
+    const auto pred1 = [&](const N& v) { return t[1].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[1], find_or_insert(&root, pred1, [&]() { return &t[1]; }));
+    TEST_ASSERT_EQUAL(&t[1], root);
+    // The root node has all NULL pointers but is still inserted because it equals root.
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[1]));
+    // Another node with all NULL pointers is not inserted.
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[2]));
+
+    // Insert more nodes.
+    const auto pred2 = [&](const N& v) { return t[2].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[2], find_or_insert(&root, pred2, [&]() { return &t[2]; }));
+    const auto pred3 = [&](const N& v) { return t[3].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[3], find_or_insert(&root, pred3, [&]() { return &t[3]; }));
+
+    // All inserted nodes should report as inserted.
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[1]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[2]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[3]));
+
+    // A node that was never inserted should not be inserted.
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[4]));
+
+    // Remove a node and check it's no longer inserted.
+    remove(&root, &t[2]);
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[2]));
+    // The removed node should have all NULL pointers.
+    TEST_ASSERT_NULL(t[2].up);
+    TEST_ASSERT_NULL(t[2].lr[0]);
+    TEST_ASSERT_NULL(t[2].lr[1]);
+
+    // The other nodes should still be inserted.
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[1]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[3]));
+
+    // Remove all remaining nodes.
+    remove(&root, &t[1]);
+    remove(&root, &t[3]);
+    TEST_ASSERT_NULL(root);
+
+    // All removed nodes should not be inserted.
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[1]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[2]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[3]));
+}
+
 } // namespace
 
 int main(const int argc, const char* const argv[])
@@ -1501,6 +1560,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_traversal_full);
     RUN_TEST(test_trivial_factory);
     RUN_TEST(test_to_owner);
+    RUN_TEST(test_is_inserted);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
