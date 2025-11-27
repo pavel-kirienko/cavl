@@ -139,6 +139,7 @@ static inline CAVL2_T* cavl2_find(CAVL2_T* root, const void* const user_comparat
 static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node);
 
 /// True iff the node is in the tree. The complexity is O(1).
+/// Returns false if the node is NULL.
 /// Assumes that the node pointers are NULL when it is not inserted (this is ensured by the removal function).
 /// If the root is NULL (empty tree), a node with all NULL pointers is considered not inserted.
 /// If the node has any non-NULL pointer, it is considered inserted.
@@ -148,8 +149,7 @@ static inline bool cavl2_is_inserted(const CAVL2_T* const root, const CAVL2_T* c
     if (NULL == node) {
         return false;
     }
-    const bool pointers_all_null = (NULL == node->up) && (NULL == node->lr[0]) && (NULL == node->lr[1]);
-    return !pointers_all_null || (node == root);
+    return (node->up != NULL) || (node->lr[0] != NULL) || (node->lr[1] != NULL) || (node == root);
 }
 
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
