@@ -135,8 +135,20 @@ static inline CAVL2_T* cavl2_find(CAVL2_T* root, const void* const user_comparat
 /// If the node is not in the tree, the behavior is undefined; it may create cycles in the tree which is deadly.
 /// It is safe to pass the result of cavl2_find/cavl2_find_or_insert directly as the second argument:
 ///     cavl2_remove(&root, cavl2_find(&root, user, search_comparator));
-/// It is recommended to invalidate the pointers stored in the node after its removal.
-static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node);
+/// The removed node will have all of its pointers set to NULL.
+static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node);
+
+/// True iff the node is in the tree. The complexity is O(1).
+/// Returns false if the node is NULL.
+/// Assumes that the node pointers are NULL when it is not inserted (this is ensured by the removal function).
+static inline bool cavl2_is_inserted(const CAVL2_T* const root, const CAVL2_T* const node)
+{
+    bool out = false;
+    if (node != NULL) {
+        out = (node->up != NULL) || (node->lr[0] != NULL) || (node->lr[1] != NULL) || (node == root);
+    }
+    return out;
+}
 
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
 /// Returns NULL iff the argument is NULL (i.e., the tree is empty). The worst-case complexity is O(log n).
@@ -344,7 +356,7 @@ static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const          root,
     return out;
 }
 
-static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node)
+static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node)
 {
     if ((root != NULL) && (node != NULL)) {
         CAVL2_ASSERT(*root != NULL); // Otherwise, the node would have to be NULL.
@@ -415,6 +427,10 @@ static inline void cavl2_remove(CAVL2_T** const root, const CAVL2_T* const node)
                 *root = c;
             }
         }
+        // Invalidate the node's pointers to indicate it is no longer in the tree.
+        node->up    = NULL;
+        node->lr[0] = NULL;
+        node->lr[1] = NULL;
     }
 }
 
