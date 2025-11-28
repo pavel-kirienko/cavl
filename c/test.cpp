@@ -125,6 +125,13 @@ void remove(Node<T>** const root, Node<T>* const n)
     cavl2_remove(reinterpret_cast<cavl2_t**>(root), n);
 }
 
+/// Wrapper over cavl2_replace().
+template<typename T>
+void replace(Node<T>** const root, Node<T>* const old_node, Node<T>* const new_node)
+{
+    cavl2_replace(reinterpret_cast<cavl2_t**>(root), old_node, new_node);
+}
+
 template<typename T>
 std::uint8_t get_height(const Node<T>* const n)
 {
@@ -1538,6 +1545,362 @@ void test_is_inserted()
     TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[3]));
 }
 
+void test_replace()
+{
+    using N = Node<std::uint8_t>;
+    // Build a tree with 7 elements:
+    //        4
+    //      /   `
+    //    2       6
+    //   / `     / `
+    //  1   3   5   7
+    N t[10]{};
+    for (std::uint8_t i = 0; i < 10; i++) {
+        t[i].value = i;
+    }
+    t[1]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
+    t[2]    = { &t[4], { &t[1], &t[3] }, 00 };
+    t[3]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
+    t[4]    = { Zzzzz, { &t[2], &t[6] }, 00 };
+    t[5]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    t[6]    = { &t[4], { &t[5], &t[7] }, 00 };
+    t[7]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    N* root = &t[4];
+    print(root);
+    TEST_ASSERT_NULL(find_broken_bf(root));
+    TEST_ASSERT_NULL(find_broken_ancestry(root));
+    TEST_ASSERT_EQUAL(7, check_ascension(root));
+
+    std::puts("=== Test replace: NULL arguments ===");
+    // Test NULL arguments - should have no effect
+    {
+        N  replacement{ 100 };
+        N* test_root = root;
+        cavl2_replace(nullptr, &t[4], &replacement);
+        TEST_ASSERT_EQUAL(root, test_root); // Unchanged
+        cavl2_replace(reinterpret_cast<cavl2_t**>(&test_root), nullptr, &replacement);
+        TEST_ASSERT_EQUAL(root, test_root); // Unchanged
+        cavl2_replace(reinterpret_cast<cavl2_t**>(&test_root), &t[4], nullptr);
+        TEST_ASSERT_EQUAL(root, test_root); // Unchanged
+        // Tree should be completely unchanged
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(7, check_ascension(root));
+    }
+
+    std::puts("=== Test replace: leaf node ===");
+    // Replace a leaf node (node 1)
+    {
+        N replacement{ 1 }; // Same value to maintain tree ordering
+        replace(&root, &t[1], &replacement);
+        print(root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(t[1].up);
+        TEST_ASSERT_NULL(t[1].lr[0]);
+        TEST_ASSERT_NULL(t[1].lr[1]);
+        // New node should be in place
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(&t[2], Zzzzz, Zzzzz, 00));
+        TEST_ASSERT_EQUAL(&replacement, t[2].lr[0]); // Parent's left child is now replacement
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(7, check_ascension(root));
+        // Restore the tree for next test
+        replace(&root, &replacement, &t[1]);
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    }
+
+    std::puts("=== Test replace: node with both children ===");
+    // Replace node 2 which has both children (1 and 3)
+    {
+        N replacement{ 2 }; // Same value to maintain tree ordering
+        replace(&root, &t[2], &replacement);
+        print(root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(t[2].up);
+        TEST_ASSERT_NULL(t[2].lr[0]);
+        TEST_ASSERT_NULL(t[2].lr[1]);
+        // New node should be in place with children updated
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(&t[4], &t[1], &t[3], 00));
+        TEST_ASSERT_EQUAL(&replacement, t[4].lr[0]); // Parent's left child is now replacement
+        TEST_ASSERT_EQUAL(&replacement, t[1].up);    // Left child points to replacement
+        TEST_ASSERT_EQUAL(&replacement, t[3].up);    // Right child points to replacement
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(7, check_ascension(root));
+        // Restore the tree for next test
+        replace(&root, &replacement, &t[2]);
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    }
+
+    std::puts("=== Test replace: root node ===");
+    // Replace the root node (node 4)
+    {
+        N replacement{ 4 }; // Same value to maintain tree ordering
+        replace(&root, &t[4], &replacement);
+        print(root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(t[4].up);
+        TEST_ASSERT_NULL(t[4].lr[0]);
+        TEST_ASSERT_NULL(t[4].lr[1]);
+        // Root should be updated
+        TEST_ASSERT_EQUAL(&replacement, root);
+        // New node should be in place with children updated
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(Zzzzz, &t[2], &t[6], 00));
+        TEST_ASSERT_EQUAL(&replacement, t[2].up); // Left child points to replacement
+        TEST_ASSERT_EQUAL(&replacement, t[6].up); // Right child points to replacement
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(7, check_ascension(root));
+        // Restore the tree for next test
+        replace(&root, &replacement, &t[4]);
+        TEST_ASSERT_EQUAL(&t[4], root);
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    }
+
+    std::puts("=== Test replace: node with only left child ===");
+    // Modify tree to have a node with only left child
+    // Remove node 7, so node 6 has only left child 5
+    remove(&root, &t[7]);
+    TEST_ASSERT_TRUE(t[6].check_linkage_up_left_right_bf(&t[4], &t[5], Zzzzz, -1));
+    print(root);
+    {
+        N replacement{ 6 }; // Same value to maintain tree ordering
+        replace(&root, &t[6], &replacement);
+        print(root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(t[6].up);
+        TEST_ASSERT_NULL(t[6].lr[0]);
+        TEST_ASSERT_NULL(t[6].lr[1]);
+        // New node should be in place with correct structure
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(&t[4], &t[5], Zzzzz, -1));
+        TEST_ASSERT_EQUAL(&replacement, t[4].lr[1]); // Parent's right child is now replacement
+        TEST_ASSERT_EQUAL(&replacement, t[5].up);    // Left child points to replacement
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(6, check_ascension(root));
+        // Restore
+        replace(&root, &replacement, &t[6]);
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    }
+
+    std::puts("=== Test replace: node with only right child ===");
+    // Now the tree has node 6 with only left child (5)
+    // Remove 5 and add 7 back to have only right child
+    remove(&root, &t[5]);
+    // Now node 6 is a leaf. Add 7 back
+    t[7]       = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    t[6].lr[1] = &t[7];
+    t[6].bf    = +1;
+    // Fix the root's balance factor
+    t[4].bf = 0; // Now tree is balanced with 6 having right child
+    print(root);
+    TEST_ASSERT_TRUE(t[6].check_linkage_up_left_right_bf(&t[4], Zzzzz, &t[7], +1));
+    TEST_ASSERT_NULL(find_broken_bf(root));
+    TEST_ASSERT_NULL(find_broken_ancestry(root));
+    {
+        N replacement{ 6 }; // Same value to maintain tree ordering
+        replace(&root, &t[6], &replacement);
+        print(root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(t[6].up);
+        TEST_ASSERT_NULL(t[6].lr[0]);
+        TEST_ASSERT_NULL(t[6].lr[1]);
+        // New node should be in place with correct structure
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(&t[4], Zzzzz, &t[7], +1));
+        TEST_ASSERT_EQUAL(&replacement, t[4].lr[1]); // Parent's right child is now replacement
+        TEST_ASSERT_EQUAL(&replacement, t[7].up);    // Right child points to replacement
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(6, check_ascension(root));
+        // Restore
+        replace(&root, &replacement, &t[6]);
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    }
+
+    std::puts("=== Test replace: single node tree (root only) ===");
+    // Create a single-node tree
+    {
+        N  single{ 42 };
+        N  replacement{ 42 };
+        N* single_root = &single;
+        single         = { Zzzzz, { Zzzzz, Zzzzz }, 00 };
+        TEST_ASSERT_EQUAL(1, check_ascension(single_root));
+        replace(&single_root, &single, &replacement);
+        // Root should be updated
+        TEST_ASSERT_EQUAL(&replacement, single_root);
+        // Old node should be cleared
+        TEST_ASSERT_NULL(single.up);
+        TEST_ASSERT_NULL(single.lr[0]);
+        TEST_ASSERT_NULL(single.lr[1]);
+        // New node should be root with no children
+        TEST_ASSERT_TRUE(replacement.check_linkage_up_left_right_bf(Zzzzz, Zzzzz, Zzzzz, 00));
+        TEST_ASSERT_NULL(find_broken_bf(single_root));
+        TEST_ASSERT_NULL(find_broken_ancestry(single_root));
+        TEST_ASSERT_EQUAL(1, check_ascension(single_root));
+    }
+
+    std::puts("=== Test replace: preserves balance factor ===");
+    // Test that various balance factors are preserved
+    {
+        // Build a tree where node has bf = -1, 0, +1
+        N n[10]{};
+        for (std::uint8_t i = 0; i < 10; i++) {
+            n[i].value = i;
+        }
+        //     5 (bf=0)
+        //    / `
+        //   3   7
+        n[5]         = { Zzzzz, { &n[3], &n[7] }, 00 };
+        n[3]         = { &n[5], { Zzzzz, Zzzzz }, 00 };
+        n[7]         = { &n[5], { Zzzzz, Zzzzz }, 00 };
+        N* test_root = &n[5];
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+
+        // Replace root with bf=0
+        N rep5{ 5 };
+        replace(&test_root, &n[5], &rep5);
+        TEST_ASSERT_EQUAL(00, rep5.bf);
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+        replace(&test_root, &rep5, &n[5]);
+
+        // Add a node to make bf=-1 (left-heavy)
+        n[2]       = { &n[3], { Zzzzz, Zzzzz }, 00 };
+        n[3].lr[0] = &n[2];
+        n[3].bf    = -1;
+        n[5].bf    = -1;
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+
+        // Replace node with bf=-1
+        N rep3_left{ 3 };
+        replace(&test_root, &n[3], &rep3_left);
+        TEST_ASSERT_EQUAL(-1, rep3_left.bf);
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+        replace(&test_root, &rep3_left, &n[3]);
+
+        // Modify to make bf=+1 (right-heavy)
+        remove(&test_root, &n[2]);
+        n[4]       = { &n[3], { Zzzzz, Zzzzz }, 00 };
+        n[3].lr[1] = &n[4];
+        n[3].bf    = +1;
+        n[5].bf    = -1; // Still left-heavy due to deeper left subtree
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+
+        // Replace node with bf=+1
+        N rep3_right{ 3 };
+        replace(&test_root, &n[3], &rep3_right);
+        TEST_ASSERT_EQUAL(+1, rep3_right.bf);
+        TEST_ASSERT_NULL(find_broken_bf(test_root));
+    }
+}
+
+void test_replace_randomized()
+{
+    using N = Node<std::uint8_t>;
+    std::array<N, 256> t{};
+    std::array<N, 256> replacements{};
+    for (auto i = 0U; i < 256U; i++) {
+        t.at(i).value            = static_cast<std::uint8_t>(i);
+        replacements.at(i).value = static_cast<std::uint8_t>(i);
+    }
+    std::array<bool, 256> mask{};
+    std::size_t           size = 0;
+    N*                    root = nullptr;
+
+    std::uint64_t cnt_addition    = 0;
+    std::uint64_t cnt_removal     = 0;
+    std::uint64_t cnt_replacement = 0;
+
+    const auto validate = [&] {
+        TEST_ASSERT_EQUAL(size,
+                          std::accumulate(mask.begin(), mask.end(), 0U, [](const std::size_t a, const std::size_t b) {
+                              return a + b;
+                          }));
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+        TEST_ASSERT_EQUAL(size, check_ascension(root));
+    };
+    validate();
+
+    const auto add = [&](const std::uint8_t x) {
+        const auto comparator = [&](const N& v) { return t.at(x).value - v.value; };
+        if (!mask.at(x)) {
+            TEST_ASSERT_EQUAL(&t.at(x), find_or_insert(&root, comparator, [&]() -> N* { return &t.at(x); }));
+            size++;
+            cnt_addition++;
+            mask.at(x) = true;
+        }
+    };
+
+    const auto drop = [&](const std::uint8_t x) {
+        const auto comparator = [&](const N& v) { return t.at(x).value - v.value; };
+        if (mask.at(x)) {
+            N* existing = find(root, comparator);
+            TEST_ASSERT_NOT_NULL(existing);
+            remove(&root, existing);
+            // Reset the removed node for potential reuse
+            t.at(x).up    = nullptr;
+            t.at(x).lr[0] = nullptr;
+            t.at(x).lr[1] = nullptr;
+            t.at(x).bf    = 0;
+            size--;
+            cnt_removal++;
+            mask.at(x) = false;
+        }
+    };
+
+    const auto do_replace = [&](const std::uint8_t x) {
+        const auto comparator = [&](const N& v) { return t.at(x).value - v.value; };
+        if (mask.at(x)) {
+            N* existing = find(root, comparator);
+            TEST_ASSERT_NOT_NULL(existing);
+            // Determine if we're currently using t[x] or replacements[x]
+            // and swap to the other one
+            N* old_node = nullptr;
+            N* new_node = nullptr;
+            if (existing == &t.at(x)) {
+                old_node = &t.at(x);
+                new_node = &replacements.at(x);
+            } else {
+                old_node = &replacements.at(x);
+                new_node = &t.at(x);
+            }
+            // Ensure new_node is clean before replacement
+            new_node->up    = nullptr;
+            new_node->lr[0] = nullptr;
+            new_node->lr[1] = nullptr;
+            new_node->bf    = 0;
+            replace(&root, old_node, new_node);
+            cnt_replacement++;
+        }
+    };
+
+    std::puts("Running the randomized replace test...");
+    for (std::uint32_t iteration = 0U; iteration < 100'000U; iteration++) {
+        const std::uint8_t action = get_random_byte() % 3U;
+        const std::uint8_t x      = get_random_byte();
+        if (action == 0U) {
+            add(x);
+        } else if (action == 1U) {
+            drop(x);
+        } else {
+            do_replace(x);
+        }
+        validate();
+    }
+
+    std::puts("Randomized replace test finished. Final state:");
+    std::printf("\tsize:            %u\n", static_cast<unsigned>(size));
+    std::printf("\tcnt_addition:    %u\n", static_cast<unsigned>(cnt_addition));
+    std::printf("\tcnt_removal:     %u\n", static_cast<unsigned>(cnt_removal));
+    std::printf("\tcnt_replacement: %u\n", static_cast<unsigned>(cnt_replacement));
+    validate();
+}
+
 } // namespace
 
 int main(const int argc, const char* const argv[])
@@ -1561,6 +1924,8 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_trivial_factory);
     RUN_TEST(test_to_owner);
     RUN_TEST(test_is_inserted);
+    RUN_TEST(test_replace);
+    RUN_TEST(test_replace_randomized);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
