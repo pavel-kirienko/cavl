@@ -138,6 +138,17 @@ static inline CAVL2_T* cavl2_find(CAVL2_T* root, const void* const user_comparat
 /// The removed node will have all of its pointers set to NULL.
 static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node);
 
+/// Replace the specified node with another node without rebalancing.
+/// This is useful when you want to replace a node with an equivalent one (same key ordering).
+/// The new node takes over the position (parent, children, balance factor) of the old node.
+/// The old node will have all of its pointers set to NULL.
+/// The new node must not already be in the tree; if it is, the behavior is undefined.
+/// The new node's fields (up, lr, bf) will be overwritten to match the old node's position in the tree.
+/// The complexity is O(1).
+/// The function has no effect if any of the pointers are NULL.
+/// If the old node is not in the tree, the behavior is undefined.
+static inline void cavl2_replace(CAVL2_T** const root, CAVL2_T* const old_node, CAVL2_T* const new_node);
+
 /// True iff the node is in the tree. The complexity is O(1).
 /// Returns false if the node is NULL.
 /// Assumes that the node pointers are NULL when it is not inserted (this is ensured by the removal function).
@@ -431,6 +442,37 @@ static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node)
         node->up    = NULL;
         node->lr[0] = NULL;
         node->lr[1] = NULL;
+    }
+}
+
+static inline void cavl2_replace(CAVL2_T** const root, CAVL2_T* const old_node, CAVL2_T* const new_node)
+{
+    if ((root != NULL) && (old_node != NULL) && (new_node != NULL)) {
+        CAVL2_ASSERT(*root != NULL);                                    // Otherwise, old_node would have to be NULL.
+        CAVL2_ASSERT((old_node->up != NULL) || (old_node == *root));    // old_node must be in the tree.
+        CAVL2_ASSERT((new_node->up == NULL) && (new_node->lr[0] == NULL) && (new_node->lr[1] == NULL));
+        // Copy the structural data from the old node to the new node.
+        new_node->up    = old_node->up;
+        new_node->lr[0] = old_node->lr[0];
+        new_node->lr[1] = old_node->lr[1];
+        new_node->bf    = old_node->bf;
+        // Update the parent to point to the new node.
+        if (old_node->up != NULL) {
+            old_node->up->lr[old_node->up->lr[1] == old_node] = new_node;
+        } else {
+            *root = new_node;
+        }
+        // Update the children to point to the new parent.
+        if (old_node->lr[0] != NULL) {
+            old_node->lr[0]->up = new_node;
+        }
+        if (old_node->lr[1] != NULL) {
+            old_node->lr[1]->up = new_node;
+        }
+        // Invalidate the old node's pointers to indicate it is no longer in the tree.
+        old_node->up    = NULL;
+        old_node->lr[0] = NULL;
+        old_node->lr[1] = NULL;
     }
 }
 
