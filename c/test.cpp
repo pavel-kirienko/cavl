@@ -1574,7 +1574,7 @@ void test_replace()
     std::puts("=== Test replace: NULL arguments ===");
     // Test NULL arguments - should have no effect
     {
-        N replacement{ 100 };
+        N  replacement{ 100 };
         N* test_root = root;
         cavl2_replace(nullptr, &t[4], &replacement);
         TEST_ASSERT_EQUAL(root, test_root); // Unchanged
@@ -1692,11 +1692,11 @@ void test_replace()
     // Remove 5 and add 7 back to have only right child
     remove(&root, &t[5]);
     // Now node 6 is a leaf. Add 7 back
-    t[7] = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    t[7]       = { &t[6], { Zzzzz, Zzzzz }, 00 };
     t[6].lr[1] = &t[7];
-    t[6].bf = +1;
+    t[6].bf    = +1;
     // Fix the root's balance factor
-    t[4].bf = 0;  // Now tree is balanced with 6 having right child
+    t[4].bf = 0; // Now tree is balanced with 6 having right child
     print(root);
     TEST_ASSERT_TRUE(t[6].check_linkage_up_left_right_bf(&t[4], Zzzzz, &t[7], +1));
     TEST_ASSERT_NULL(find_broken_bf(root));
@@ -1725,10 +1725,10 @@ void test_replace()
     std::puts("=== Test replace: single node tree (root only) ===");
     // Create a single-node tree
     {
-        N single{ 42 };
-        N replacement{ 42 };
+        N  single{ 42 };
+        N  replacement{ 42 };
         N* single_root = &single;
-        single = { Zzzzz, { Zzzzz, Zzzzz }, 00 };
+        single         = { Zzzzz, { Zzzzz, Zzzzz }, 00 };
         TEST_ASSERT_EQUAL(1, check_ascension(single_root));
         replace(&single_root, &single, &replacement);
         // Root should be updated
@@ -1755,9 +1755,9 @@ void test_replace()
         //     5 (bf=0)
         //    / `
         //   3   7
-        n[5] = { Zzzzz, { &n[3], &n[7] }, 00 };
-        n[3] = { &n[5], { Zzzzz, Zzzzz }, 00 };
-        n[7] = { &n[5], { Zzzzz, Zzzzz }, 00 };
+        n[5]         = { Zzzzz, { &n[3], &n[7] }, 00 };
+        n[3]         = { &n[5], { Zzzzz, Zzzzz }, 00 };
+        n[7]         = { &n[5], { Zzzzz, Zzzzz }, 00 };
         N* test_root = &n[5];
         TEST_ASSERT_NULL(find_broken_bf(test_root));
 
@@ -1769,10 +1769,10 @@ void test_replace()
         replace(&test_root, &rep5, &n[5]);
 
         // Add a node to make bf=-1 (left-heavy)
-        n[2] = { &n[3], { Zzzzz, Zzzzz }, 00 };
+        n[2]       = { &n[3], { Zzzzz, Zzzzz }, 00 };
         n[3].lr[0] = &n[2];
-        n[3].bf = -1;
-        n[5].bf = -1;
+        n[3].bf    = -1;
+        n[5].bf    = -1;
         TEST_ASSERT_NULL(find_broken_bf(test_root));
 
         // Replace node with bf=-1
@@ -1784,10 +1784,10 @@ void test_replace()
 
         // Modify to make bf=+1 (right-heavy)
         remove(&test_root, &n[2]);
-        n[4] = { &n[3], { Zzzzz, Zzzzz }, 00 };
+        n[4]       = { &n[3], { Zzzzz, Zzzzz }, 00 };
         n[3].lr[1] = &n[4];
-        n[3].bf = +1;
-        n[5].bf = -1; // Still left-heavy due to deeper left subtree
+        n[3].bf    = +1;
+        n[5].bf    = -1; // Still left-heavy due to deeper left subtree
         TEST_ASSERT_NULL(find_broken_bf(test_root));
 
         // Replace node with bf=+1

@@ -448,8 +448,8 @@ static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node)
 static inline void cavl2_replace(CAVL2_T** const root, CAVL2_T* const old_node, CAVL2_T* const new_node)
 {
     if ((root != NULL) && (old_node != NULL) && (new_node != NULL)) {
-        CAVL2_ASSERT(*root != NULL);                                    // Otherwise, old_node would have to be NULL.
-        CAVL2_ASSERT((old_node->up != NULL) || (old_node == *root));    // old_node must be in the tree.
+        CAVL2_ASSERT(*root != NULL);                                 // Otherwise, old_node would have to be NULL.
+        CAVL2_ASSERT((old_node->up != NULL) || (old_node == *root)); // old_node must be in the tree.
         CAVL2_ASSERT((new_node->up == NULL) && (new_node->lr[0] == NULL) && (new_node->lr[1] == NULL));
         // Copy the structural data from the old node to the new node.
         new_node->up    = old_node->up;
