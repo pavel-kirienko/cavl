@@ -206,6 +206,93 @@ static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
     return c;
 }
 
+/// Returns the next smaller node in the in-order traversal of the tree (the predecessor).
+/// Does nothing and returns NULL if the argument is NULL. Behavior undefined if the node is not in the tree.
+/// This is the opposite of cavl2_next_greater(). For reverse traversal, use:
+///     for (CAVL2_T* p = cavl2_max(root); p != NULL; p = cavl2_predecessor(p)) {
+///         ...
+///     }
+/// The asymptotic complexity for traversing the entire tree is O(n), identical to the traditional recursive traversal.
+static inline CAVL2_T* cavl2_predecessor(CAVL2_T* const node)
+{
+    CAVL2_T* c = NULL;
+    if (node != NULL) {
+        if (node->lr[0] != NULL) {
+            c = cavl2_max(node->lr[0]);
+        } else {
+            const CAVL2_T* n = node;
+            CAVL2_T*       p = node->up;
+            while ((p != NULL) && (p->lr[0] == n)) {
+                n = p;
+                p = p->up;
+            }
+            c = p;
+        }
+    }
+    return c;
+}
+
+// clang-format off
+/// Alias for cavl2_next_greater() for naming consistency with cavl2_predecessor().
+static inline CAVL2_T* cavl2_successor(CAVL2_T* const node) { return cavl2_next_greater(node); }
+// clang-format on
+
+/// Find the smallest node whose value is greater than or equal to the search target (lower bound).
+/// Returns the first node for which the comparator returns a non-positive (zero or negative) result.
+/// If no such node exists (all nodes compare less than target), returns NULL.
+/// The comparator function returns: positive if target > node, zero if target == node, negative if target < node.
+/// This is similar to std::lower_bound in C++.
+/// The worst-case complexity is O(log n).
+static inline CAVL2_T* cavl2_lower_bound(CAVL2_T* const          root,
+                                         const void* const       user,
+                                         const cavl2_comparator_t comparator)
+{
+    CAVL2_T* result = NULL;
+    if ((root != NULL) && (comparator != NULL)) {
+        CAVL2_T* n = root;
+        while (n != NULL) {
+            const CAVL2_RELATION cmp = comparator(user, n);
+            if (cmp <= 0) {
+                // Target <= node: this node is a candidate, but there may be smaller ones on the left.
+                result = n;
+                n      = n->lr[0];
+            } else {
+                // Target > node: need to go right to find larger nodes.
+                n = n->lr[1];
+            }
+        }
+    }
+    return result;
+}
+
+/// Find the smallest node whose value is strictly greater than the search target (upper bound).
+/// Returns the first node for which the comparator returns a negative result.
+/// If no such node exists (all nodes compare less than or equal to target), returns NULL.
+/// The comparator function returns: positive if target > node, zero if target == node, negative if target < node.
+/// This is similar to std::upper_bound in C++.
+/// The worst-case complexity is O(log n).
+static inline CAVL2_T* cavl2_upper_bound(CAVL2_T* const          root,
+                                         const void* const       user,
+                                         const cavl2_comparator_t comparator)
+{
+    CAVL2_T* result = NULL;
+    if ((root != NULL) && (comparator != NULL)) {
+        CAVL2_T* n = root;
+        while (n != NULL) {
+            const CAVL2_RELATION cmp = comparator(user, n);
+            if (cmp < 0) {
+                // Target < node: this node is a candidate, but there may be smaller ones on the left.
+                result = n;
+                n      = n->lr[0];
+            } else {
+                // Target >= node: need to go right to find larger nodes.
+                n = n->lr[1];
+            }
+        }
+    }
+    return result;
+}
+
 /// The trivial factory is useful in most applications. It simply returns the user pointed converted to CAVL2_T.
 /// It is meant for use with cavl2_find_or_insert().
 static inline CAVL2_T* cavl2_trivial_factory(void* const user)

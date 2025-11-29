@@ -1901,6 +1901,317 @@ void test_replace_randomized()
     validate();
 }
 
+void test_predecessor()
+{
+    using N = Node<std::uint8_t>;
+    std::array<N, 256> t{};
+    for (std::size_t i = 0U; i < 256U; i++) {
+        t.at(i).value = static_cast<std::uint8_t>(i);
+    }
+    N* root = nullptr;
+
+    // Add all nodes into the tree in order.
+    for (std::size_t i = 0; i < 256U; i++) {
+        const auto pred = [&](const N& v) { return t[i].value - v.value; };
+        TEST_ASSERT_NULL(find(root, pred));
+        TEST_ASSERT_EQUAL(&t[i], find_or_insert(&root, pred, [&] { return &t[i]; }));
+        TEST_ASSERT_EQUAL(&t[i], find(root, pred));
+    }
+
+    // Test predecessor() - traverse from max to min
+    std::int16_t last_value = 256;
+    N*           node       = root->max();
+    TEST_ASSERT_EQUAL(255, node->value);
+    while (node != nullptr) {
+        TEST_ASSERT_EQUAL(last_value - 1, static_cast<std::int16_t>(node->value));
+        last_value = node->value;
+        node       = reinterpret_cast<N*>(cavl2_predecessor(node));
+    }
+    TEST_ASSERT_EQUAL(0, last_value);
+
+    // Test that predecessor() is the inverse of next_greater()
+    // For each node (except min), its predecessor's successor should be itself
+    for (std::size_t i = 1; i < 256U; i++) {
+        N* pred = reinterpret_cast<N*>(cavl2_predecessor(&t[i]));
+        TEST_ASSERT_NOT_NULL(pred);
+        TEST_ASSERT_EQUAL(i - 1, pred->value);
+        TEST_ASSERT_EQUAL(&t[i], cavl2_next_greater(pred));
+    }
+
+    // The predecessor of the min element should be NULL
+    TEST_ASSERT_NULL(cavl2_predecessor(root->min()));
+
+    // Test NULL input
+    TEST_ASSERT_NULL(cavl2_predecessor(nullptr));
+}
+
+void test_successor()
+{
+    using N = Node<std::uint8_t>;
+    N t[10]{};
+    for (std::uint8_t i = 0; i < 10; i++) {
+        t[i].value = i;
+    }
+    // Build a simple tree:
+    //      4
+    //    /   `
+    //   2     6
+    //  / `   / `
+    // 1   3 5   7
+    t[1]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
+    t[2]    = { &t[4], { &t[1], &t[3] }, 00 };
+    t[3]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
+    t[4]    = { Zzzzz, { &t[2], &t[6] }, 00 };
+    t[5]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    t[6]    = { &t[4], { &t[5], &t[7] }, 00 };
+    t[7]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
+    N* root = &t[4];
+
+    // Test that successor() is an alias for next_greater()
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[1]), cavl2_successor(&t[1]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[2]), cavl2_successor(&t[2]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[3]), cavl2_successor(&t[3]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[4]), cavl2_successor(&t[4]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[5]), cavl2_successor(&t[5]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[6]), cavl2_successor(&t[6]));
+    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[7]), cavl2_successor(&t[7]));
+
+    // Verify the expected succession
+    TEST_ASSERT_EQUAL(&t[2], cavl2_successor(&t[1]));
+    TEST_ASSERT_EQUAL(&t[3], cavl2_successor(&t[2]));
+    TEST_ASSERT_EQUAL(&t[4], cavl2_successor(&t[3]));
+    TEST_ASSERT_EQUAL(&t[5], cavl2_successor(&t[4]));
+    TEST_ASSERT_EQUAL(&t[6], cavl2_successor(&t[5]));
+    TEST_ASSERT_EQUAL(&t[7], cavl2_successor(&t[6]));
+    TEST_ASSERT_NULL(cavl2_successor(&t[7]));
+
+    // Test NULL input
+    TEST_ASSERT_NULL(cavl2_successor(nullptr));
+
+    (void)root;
+}
+
+void test_lower_bound()
+{
+    using N = Node<std::uint8_t>;
+    N t[20]{};
+    for (std::uint8_t i = 0; i < 20; i++) {
+        t[i].value = i;
+    }
+    // Build a tree with even values only: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    //          10
+    //       /      `
+    //      4        14
+    //    /   `     /   `
+    //   2     6   12    16
+    //          `   `      `
+    //           8   13    18
+    //
+    // Actually let's build a simpler tree to be certain of values
+    // We'll use find_or_insert with even values.
+    N* root = nullptr;
+    std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
+    for (auto v : values) {
+        const auto pred = [&](const N& node) -> std::ptrdiff_t { return static_cast<std::ptrdiff_t>(v) - node.value; };
+        find_or_insert(&root, pred, [&] { return &t[v]; });
+    }
+
+    // Raw comparator function for cavl2_lower_bound
+    struct Comparator {
+        static std::ptrdiff_t compare(const void* user, const cavl2_t* node) {
+            auto target = *static_cast<const std::uint8_t*>(user);
+            auto value  = reinterpret_cast<const N*>(node)->value;
+            return static_cast<std::ptrdiff_t>(target) - static_cast<std::ptrdiff_t>(value);
+        }
+    };
+
+    // Test lower_bound for values that exist in the tree
+    std::uint8_t target = 2;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_lower_bound(root, &target, &Comparator::compare));
+    target = 10;
+    TEST_ASSERT_EQUAL(&t[10], cavl2_lower_bound(root, &target, &Comparator::compare));
+    target = 18;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Test lower_bound for values that don't exist in the tree
+    // Looking for 3: lower_bound should return 4 (first >= 3)
+    target = 3;
+    TEST_ASSERT_EQUAL(&t[4], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 5: lower_bound should return 6 (first >= 5)
+    target = 5;
+    TEST_ASSERT_EQUAL(&t[6], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 7: lower_bound should return 8 (first >= 7)
+    target = 7;
+    TEST_ASSERT_EQUAL(&t[8], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 1: lower_bound should return 2 (first >= 1)
+    target = 1;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 0: lower_bound should return 2 (first >= 0)
+    target = 0;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 19: lower_bound should return NULL (no value >= 19)
+    target = 19;
+    TEST_ASSERT_NULL(cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Looking for 100: lower_bound should return NULL
+    target = 100;
+    TEST_ASSERT_NULL(cavl2_lower_bound(root, &target, &Comparator::compare));
+
+    // Test NULL arguments
+    TEST_ASSERT_NULL(cavl2_lower_bound(nullptr, &target, &Comparator::compare));
+    TEST_ASSERT_NULL(cavl2_lower_bound(root, &target, nullptr));
+}
+
+void test_upper_bound()
+{
+    using N = Node<std::uint8_t>;
+    N t[20]{};
+    for (std::uint8_t i = 0; i < 20; i++) {
+        t[i].value = i;
+    }
+    // Build a tree with even values only: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    N* root = nullptr;
+    std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
+    for (auto v : values) {
+        const auto pred = [&](const N& node) -> std::ptrdiff_t { return static_cast<std::ptrdiff_t>(v) - node.value; };
+        find_or_insert(&root, pred, [&] { return &t[v]; });
+    }
+
+    // Raw comparator function for cavl2_upper_bound
+    struct Comparator {
+        static std::ptrdiff_t compare(const void* user, const cavl2_t* node) {
+            auto target = *static_cast<const std::uint8_t*>(user);
+            auto value  = reinterpret_cast<const N*>(node)->value;
+            return static_cast<std::ptrdiff_t>(target) - static_cast<std::ptrdiff_t>(value);
+        }
+    };
+
+    // Test upper_bound for values that exist in the tree
+    // upper_bound returns the first value STRICTLY GREATER than the target
+    std::uint8_t target = 2;
+    TEST_ASSERT_EQUAL(&t[4], cavl2_upper_bound(root, &target, &Comparator::compare)); // First > 2 is 4
+    target = 4;
+    TEST_ASSERT_EQUAL(&t[6], cavl2_upper_bound(root, &target, &Comparator::compare)); // First > 4 is 6
+    target = 10;
+    TEST_ASSERT_EQUAL(&t[12], cavl2_upper_bound(root, &target, &Comparator::compare)); // First > 10 is 12
+    target = 16;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_upper_bound(root, &target, &Comparator::compare)); // First > 16 is 18
+
+    // Test upper_bound for values that don't exist in the tree
+    // Looking for 3: upper_bound should return 4 (first > 3)
+    target = 3;
+    TEST_ASSERT_EQUAL(&t[4], cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 5: upper_bound should return 6 (first > 5)
+    target = 5;
+    TEST_ASSERT_EQUAL(&t[6], cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 7: upper_bound should return 8 (first > 7)
+    target = 7;
+    TEST_ASSERT_EQUAL(&t[8], cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 1: upper_bound should return 2 (first > 1)
+    target = 1;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 0: upper_bound should return 2 (first > 0)
+    target = 0;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 18: upper_bound should return NULL (no value > 18)
+    target = 18;
+    TEST_ASSERT_NULL(cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 19: upper_bound should return NULL
+    target = 19;
+    TEST_ASSERT_NULL(cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Looking for 100: upper_bound should return NULL
+    target = 100;
+    TEST_ASSERT_NULL(cavl2_upper_bound(root, &target, &Comparator::compare));
+
+    // Test NULL arguments
+    TEST_ASSERT_NULL(cavl2_upper_bound(nullptr, &target, &Comparator::compare));
+    TEST_ASSERT_NULL(cavl2_upper_bound(root, &target, nullptr));
+}
+
+void test_bounds_comprehensive()
+{
+    // Test with a complete tree and verify behavior at all boundaries
+    using N = Node<std::uint8_t>;
+    std::array<N, 256> t{};
+    for (std::size_t i = 0U; i < 256U; i++) {
+        t.at(i).value = static_cast<std::uint8_t>(i);
+    }
+    N* root = nullptr;
+
+    // Add only even values: 0, 2, 4, 6, ..., 254
+    for (std::size_t i = 0; i < 256U; i += 2) {
+        const auto pred = [&](const N& v) { return static_cast<std::ptrdiff_t>(t[i].value) - v.value; };
+        find_or_insert(&root, pred, [&] { return &t[i]; });
+    }
+
+    struct Comparator {
+        static std::ptrdiff_t compare(const void* user, const cavl2_t* node) {
+            auto target = *static_cast<const std::uint8_t*>(user);
+            auto value  = reinterpret_cast<const N*>(node)->value;
+            return static_cast<std::ptrdiff_t>(target) - static_cast<std::ptrdiff_t>(value);
+        }
+    };
+
+    // Test that lower_bound and upper_bound behave correctly for all values
+    for (std::size_t i = 0; i < 256; i++) {
+        std::uint8_t target = static_cast<std::uint8_t>(i);
+
+        // Expected lower_bound: smallest even >= i
+        // For odd i, it's i+1. For even i, it's i itself.
+        // If no such value exists (i > 254), return NULL.
+        std::size_t expected_lower = (i % 2 == 0) ? i : (i + 1);
+        // Expected upper_bound: smallest even > i
+        // For odd i, it's i+1. For even i, it's i+2.
+        // If no such value exists (expected > 254), return NULL.
+        std::size_t expected_upper = (i % 2 == 0) ? (i + 2) : (i + 1);
+
+        N* lower = reinterpret_cast<N*>(cavl2_lower_bound(root, &target, &Comparator::compare));
+        N* upper = reinterpret_cast<N*>(cavl2_upper_bound(root, &target, &Comparator::compare));
+
+        if (expected_lower <= 254) {
+            TEST_ASSERT_NOT_NULL(lower);
+            TEST_ASSERT_EQUAL(static_cast<std::uint8_t>(expected_lower), lower->value);
+        } else {
+            TEST_ASSERT_NULL(lower);
+        }
+
+        if (expected_upper <= 254) {
+            TEST_ASSERT_NOT_NULL(upper);
+            TEST_ASSERT_EQUAL(static_cast<std::uint8_t>(expected_upper), upper->value);
+        } else {
+            TEST_ASSERT_NULL(upper);
+        }
+    }
+
+    // Verify: for existing values, lower_bound returns the value itself, upper_bound returns the next
+    for (std::size_t i = 0; i < 256; i += 2) {
+        std::uint8_t target = static_cast<std::uint8_t>(i);
+        N* lower = reinterpret_cast<N*>(cavl2_lower_bound(root, &target, &Comparator::compare));
+        TEST_ASSERT_NOT_NULL(lower);
+        TEST_ASSERT_EQUAL(target, lower->value);
+
+        N* upper = reinterpret_cast<N*>(cavl2_upper_bound(root, &target, &Comparator::compare));
+        if (i == 254) {
+            TEST_ASSERT_NULL(upper);
+        } else {
+            TEST_ASSERT_NOT_NULL(upper);
+            TEST_ASSERT_EQUAL(static_cast<std::uint8_t>(target + 2), upper->value);
+        }
+    }
+}
+
 } // namespace
 
 int main(const int argc, const char* const argv[])
@@ -1926,6 +2237,11 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_is_inserted);
     RUN_TEST(test_replace);
     RUN_TEST(test_replace_randomized);
+    RUN_TEST(test_predecessor);
+    RUN_TEST(test_successor);
+    RUN_TEST(test_lower_bound);
+    RUN_TEST(test_upper_bound);
+    RUN_TEST(test_bounds_comprehensive);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
