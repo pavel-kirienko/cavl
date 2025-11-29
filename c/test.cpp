@@ -1998,17 +1998,8 @@ void test_lower_bound()
     for (std::uint8_t i = 0; i < 20; i++) {
         t[i].value = i;
     }
-    // Build a tree with even values only: 2, 4, 6, 8, 10, 12, 14, 16, 18
-    //          10
-    //       /      `
-    //      4        14
-    //    /   `     /   `
-    //   2     6   12    16
-    //          `   `      `
-    //           8   13    18
-    //
-    // Actually let's build a simpler tree to be certain of values
-    // We'll use find_or_insert with even values.
+    // Build a tree with even values: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    // The tree structure depends on insertion order; we use find_or_insert.
     N* root = nullptr;
     std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
     for (auto v : values) {
@@ -2074,7 +2065,7 @@ void test_upper_bound()
     for (std::uint8_t i = 0; i < 20; i++) {
         t[i].value = i;
     }
-    // Build a tree with even values only: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    // Build a tree with even values: 2, 4, 6, 8, 10, 12, 14, 16, 18
     N* root = nullptr;
     std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
     for (auto v : values) {
