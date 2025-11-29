@@ -206,6 +206,54 @@ static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
     return c;
 }
 
+/// Find the smallest node whose value is greater than or equal to the search target, in O(log n).
+/// Returns the first node for which the comparator returns a non-positive result.
+/// If no such node exists (all nodes compare less than target), returns NULL.
+/// The comparator function returns: positive if target > candidate, zero if target == candidate, negative if target <
+/// candidate.
+static inline CAVL2_T* cavl2_lower_bound(CAVL2_T* const           root,
+                                         const void* const        user,
+                                         const cavl2_comparator_t comparator)
+{
+    CAVL2_T* result = NULL;
+    if ((root != NULL) && (comparator != NULL)) {
+        CAVL2_T* n = root;
+        while (n != NULL) {
+            const CAVL2_RELATION cmp = comparator(user, n);
+            if (cmp <= 0) {
+                result = n;
+                n      = n->lr[0];
+            } else {
+                n = n->lr[1];
+            }
+        }
+    }
+    return result;
+}
+
+/// Find the smallest node whose value is strictly greater than the search target (upper bound).
+/// Returns the first node for which the comparator returns a negative result.
+/// See cavl2_lower_bound() for details.
+static inline CAVL2_T* cavl2_upper_bound(CAVL2_T* const           root,
+                                         const void* const        user,
+                                         const cavl2_comparator_t comparator)
+{
+    CAVL2_T* result = NULL;
+    if ((root != NULL) && (comparator != NULL)) {
+        CAVL2_T* n = root;
+        while (n != NULL) {
+            const CAVL2_RELATION cmp = comparator(user, n);
+            if (cmp < 0) {
+                result = n;
+                n      = n->lr[0];
+            } else {
+                n = n->lr[1];
+            }
+        }
+    }
+    return result;
+}
+
 /// The trivial factory is useful in most applications. It simply returns the user pointed converted to CAVL2_T.
 /// It is meant for use with cavl2_find_or_insert().
 static inline CAVL2_T* cavl2_trivial_factory(void* const user)
