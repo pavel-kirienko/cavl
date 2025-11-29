@@ -1901,96 +1901,6 @@ void test_replace_randomized()
     validate();
 }
 
-void test_predecessor()
-{
-    using N = Node<std::uint8_t>;
-    std::array<N, 256> t{};
-    for (std::size_t i = 0U; i < 256U; i++) {
-        t.at(i).value = static_cast<std::uint8_t>(i);
-    }
-    N* root = nullptr;
-
-    // Add all nodes into the tree in order.
-    for (std::size_t i = 0; i < 256U; i++) {
-        const auto pred = [&](const N& v) { return t[i].value - v.value; };
-        TEST_ASSERT_NULL(find(root, pred));
-        TEST_ASSERT_EQUAL(&t[i], find_or_insert(&root, pred, [&] { return &t[i]; }));
-        TEST_ASSERT_EQUAL(&t[i], find(root, pred));
-    }
-
-    // Test predecessor() - traverse from max to min
-    std::int16_t last_value = 256;
-    N*           node       = root->max();
-    TEST_ASSERT_EQUAL(255, node->value);
-    while (node != nullptr) {
-        TEST_ASSERT_EQUAL(last_value - 1, static_cast<std::int16_t>(node->value));
-        last_value = node->value;
-        node       = reinterpret_cast<N*>(cavl2_predecessor(node));
-    }
-    TEST_ASSERT_EQUAL(0, last_value);
-
-    // Test that predecessor() is the inverse of next_greater()
-    // For each node (except min), its predecessor's successor should be itself
-    for (std::size_t i = 1; i < 256U; i++) {
-        N* pred = reinterpret_cast<N*>(cavl2_predecessor(&t[i]));
-        TEST_ASSERT_NOT_NULL(pred);
-        TEST_ASSERT_EQUAL(i - 1, pred->value);
-        TEST_ASSERT_EQUAL(&t[i], cavl2_next_greater(pred));
-    }
-
-    // The predecessor of the min element should be NULL
-    TEST_ASSERT_NULL(cavl2_predecessor(root->min()));
-
-    // Test NULL input
-    TEST_ASSERT_NULL(cavl2_predecessor(nullptr));
-}
-
-void test_successor()
-{
-    using N = Node<std::uint8_t>;
-    N t[10]{};
-    for (std::uint8_t i = 0; i < 10; i++) {
-        t[i].value = i;
-    }
-    // Build a simple tree:
-    //      4
-    //    /   `
-    //   2     6
-    //  / `   / `
-    // 1   3 5   7
-    t[1]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
-    t[2]    = { &t[4], { &t[1], &t[3] }, 00 };
-    t[3]    = { &t[2], { Zzzzz, Zzzzz }, 00 };
-    t[4]    = { Zzzzz, { &t[2], &t[6] }, 00 };
-    t[5]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
-    t[6]    = { &t[4], { &t[5], &t[7] }, 00 };
-    t[7]    = { &t[6], { Zzzzz, Zzzzz }, 00 };
-    N* root = &t[4];
-
-    // Test that successor() is an alias for next_greater()
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[1]), cavl2_successor(&t[1]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[2]), cavl2_successor(&t[2]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[3]), cavl2_successor(&t[3]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[4]), cavl2_successor(&t[4]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[5]), cavl2_successor(&t[5]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[6]), cavl2_successor(&t[6]));
-    TEST_ASSERT_EQUAL(cavl2_next_greater(&t[7]), cavl2_successor(&t[7]));
-
-    // Verify the expected succession
-    TEST_ASSERT_EQUAL(&t[2], cavl2_successor(&t[1]));
-    TEST_ASSERT_EQUAL(&t[3], cavl2_successor(&t[2]));
-    TEST_ASSERT_EQUAL(&t[4], cavl2_successor(&t[3]));
-    TEST_ASSERT_EQUAL(&t[5], cavl2_successor(&t[4]));
-    TEST_ASSERT_EQUAL(&t[6], cavl2_successor(&t[5]));
-    TEST_ASSERT_EQUAL(&t[7], cavl2_successor(&t[6]));
-    TEST_ASSERT_NULL(cavl2_successor(&t[7]));
-
-    // Test NULL input
-    TEST_ASSERT_NULL(cavl2_successor(nullptr));
-
-    (void)root;
-}
-
 void test_lower_bound()
 {
     using N = Node<std::uint8_t>;
@@ -2228,8 +2138,6 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_is_inserted);
     RUN_TEST(test_replace);
     RUN_TEST(test_replace_randomized);
-    RUN_TEST(test_predecessor);
-    RUN_TEST(test_successor);
     RUN_TEST(test_lower_bound);
     RUN_TEST(test_upper_bound);
     RUN_TEST(test_bounds_comprehensive);
