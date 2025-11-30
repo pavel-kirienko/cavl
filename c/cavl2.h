@@ -210,6 +210,7 @@ static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
 /// Returns the first node for which the comparator returns a non-positive result.
 /// If no such node exists (all nodes compare less than target), returns NULL.
 /// The comparator returns: positive if target>candidate, zero if target==candidate, negative if target<candidate.
+/// Example: tree={1,3,5,7}, target=4 => 5; target=5 => 5; target=8 => NULL.
 static inline CAVL2_T* cavl2_lower_bound(CAVL2_T* const           root,
                                          const void* const        user,
                                          const cavl2_comparator_t comparator)
@@ -233,6 +234,7 @@ static inline CAVL2_T* cavl2_lower_bound(CAVL2_T* const           root,
 /// Find the smallest node whose value is strictly greater than the search target (upper bound).
 /// Returns the first node for which the comparator returns a negative result.
 /// See cavl2_lower_bound() for details.
+/// Example: tree={1,3,5,7}, target=4 => 5; target=5 => 7; target=7 => NULL.
 static inline CAVL2_T* cavl2_upper_bound(CAVL2_T* const           root,
                                          const void* const        user,
                                          const cavl2_comparator_t comparator)
@@ -256,6 +258,7 @@ static inline CAVL2_T* cavl2_upper_bound(CAVL2_T* const           root,
 /// Find the largest node whose value is less than or equal to the search target, in O(log n).
 /// Returns the last node for which the comparator returns a non-negative result.
 /// See cavl2_lower_bound() for details.
+/// Example: tree={1,3,5,7}, target=4 => 3; target=5 => 5; target=0 => NULL.
 static inline CAVL2_T* cavl2_predecessor(CAVL2_T* const           root,
                                          const void* const        user,
                                          const cavl2_comparator_t comparator)
@@ -277,6 +280,7 @@ static inline CAVL2_T* cavl2_predecessor(CAVL2_T* const           root,
 }
 
 /// The successor counterpart of cavl2_predecessor() is an alias of cavl2_lower_bound(), provided for completeness only.
+/// Example: tree={1,3,5,7}, target=4 => 5; target=5 => 5; target=8 => NULL.
 static inline CAVL2_T* cavl2_successor(CAVL2_T* const root, const void* const user, const cavl2_comparator_t comparator)
 {
     return cavl2_lower_bound(root, user, comparator);
