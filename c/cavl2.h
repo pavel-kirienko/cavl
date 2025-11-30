@@ -254,6 +254,39 @@ static inline CAVL2_T* cavl2_upper_bound(CAVL2_T* const           root,
     return result;
 }
 
+/// Find the largest node whose value is less than or equal to the search target (predecessor), in O(log n).
+/// Returns the last node for which the comparator returns a non-negative result.
+/// If no such node exists (all nodes compare greater than target), returns NULL.
+static inline CAVL2_T* cavl2_predecessor(CAVL2_T* const           root,
+                                          const void* const        user,
+                                          const cavl2_comparator_t comparator)
+{
+    CAVL2_T* result = NULL;
+    if ((root != NULL) && (comparator != NULL)) {
+        CAVL2_T* n = root;
+        while (n != NULL) {
+            const CAVL2_RELATION cmp = comparator(user, n);
+            if (cmp >= 0) {
+                result = n;
+                n      = n->lr[1];
+            } else {
+                n = n->lr[0];
+            }
+        }
+    }
+    return result;
+}
+
+/// Find the smallest node whose value is greater than or equal to the search target (successor), in O(log n).
+/// Returns the first node for which the comparator returns a non-positive result.
+/// Equivalent to cavl2_lower_bound(); provided for naming symmetry with cavl2_predecessor().
+static inline CAVL2_T* cavl2_successor(CAVL2_T* const           root,
+                                        const void* const        user,
+                                        const cavl2_comparator_t comparator)
+{
+    return cavl2_lower_bound(root, user, comparator);
+}
+
 /// The trivial factory is useful in most applications. It simply returns the user pointed converted to CAVL2_T.
 /// It is meant for use with cavl2_find_or_insert().
 static inline CAVL2_T* cavl2_trivial_factory(void* const user)

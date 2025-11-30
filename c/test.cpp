@@ -2045,6 +2045,140 @@ void test_upper_bound()
     TEST_ASSERT_NULL(cavl2_upper_bound(root, &target, nullptr));
 }
 
+void test_predecessor()
+{
+    using N = Node<std::uint8_t>;
+    N t[20]{};
+    for (std::uint8_t i = 0; i < 20; i++) {
+        t[i].value = i;
+    }
+    // Build a tree with even values: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    N*                                root   = nullptr;
+    const std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
+    for (auto v : values) {
+        const auto pred = [&](const N& node) -> std::ptrdiff_t { return static_cast<std::ptrdiff_t>(v) - node.value; };
+        find_or_insert(&root, pred, [&] { return &t[v]; });
+    }
+
+    struct Comparator
+    {
+        static std::ptrdiff_t compare(const void* user, const cavl2_t* node)
+        {
+            auto target = *static_cast<const std::uint8_t*>(user);
+            auto value  = reinterpret_cast<const N*>(node)->value;
+            return static_cast<std::ptrdiff_t>(target) - static_cast<std::ptrdiff_t>(value);
+        }
+    };
+
+    // Test predecessor for values that exist in the tree
+    std::uint8_t target = 2;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_predecessor(root, &target, &Comparator::compare));
+    target = 10;
+    TEST_ASSERT_EQUAL(&t[10], cavl2_predecessor(root, &target, &Comparator::compare));
+    target = 18;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Test predecessor for values that don't exist in the tree
+    // Looking for 3: predecessor should return 2 (largest <= 3)
+    target = 3;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 5: predecessor should return 4 (largest <= 5)
+    target = 5;
+    TEST_ASSERT_EQUAL(&t[4], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 7: predecessor should return 6 (largest <= 7)
+    target = 7;
+    TEST_ASSERT_EQUAL(&t[6], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 19: predecessor should return 18 (largest <= 19)
+    target = 19;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 100: predecessor should return 18 (largest value in tree)
+    target = 100;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 1: predecessor should return NULL (no value <= 1)
+    target = 1;
+    TEST_ASSERT_NULL(cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Looking for 0: predecessor should return NULL
+    target = 0;
+    TEST_ASSERT_NULL(cavl2_predecessor(root, &target, &Comparator::compare));
+
+    // Test NULL arguments
+    TEST_ASSERT_NULL(cavl2_predecessor(nullptr, &target, &Comparator::compare));
+    TEST_ASSERT_NULL(cavl2_predecessor(root, &target, nullptr));
+}
+
+void test_successor()
+{
+    using N = Node<std::uint8_t>;
+    N t[20]{};
+    for (std::uint8_t i = 0; i < 20; i++) {
+        t[i].value = i;
+    }
+    // Build a tree with even values: 2, 4, 6, 8, 10, 12, 14, 16, 18
+    N*                                root   = nullptr;
+    const std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
+    for (auto v : values) {
+        const auto pred = [&](const N& node) -> std::ptrdiff_t { return static_cast<std::ptrdiff_t>(v) - node.value; };
+        find_or_insert(&root, pred, [&] { return &t[v]; });
+    }
+
+    struct Comparator
+    {
+        static std::ptrdiff_t compare(const void* user, const cavl2_t* node)
+        {
+            auto target = *static_cast<const std::uint8_t*>(user);
+            auto value  = reinterpret_cast<const N*>(node)->value;
+            return static_cast<std::ptrdiff_t>(target) - static_cast<std::ptrdiff_t>(value);
+        }
+    };
+
+    // Test successor for values that exist in the tree (should return the value itself)
+    std::uint8_t target = 2;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_successor(root, &target, &Comparator::compare));
+    target = 10;
+    TEST_ASSERT_EQUAL(&t[10], cavl2_successor(root, &target, &Comparator::compare));
+    target = 18;
+    TEST_ASSERT_EQUAL(&t[18], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Test successor for values that don't exist in the tree
+    // Looking for 3: successor should return 4 (smallest >= 3)
+    target = 3;
+    TEST_ASSERT_EQUAL(&t[4], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 5: successor should return 6 (smallest >= 5)
+    target = 5;
+    TEST_ASSERT_EQUAL(&t[6], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 7: successor should return 8 (smallest >= 7)
+    target = 7;
+    TEST_ASSERT_EQUAL(&t[8], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 1: successor should return 2 (smallest >= 1)
+    target = 1;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 0: successor should return 2 (smallest >= 0)
+    target = 0;
+    TEST_ASSERT_EQUAL(&t[2], cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 19: successor should return NULL (no value >= 19)
+    target = 19;
+    TEST_ASSERT_NULL(cavl2_successor(root, &target, &Comparator::compare));
+
+    // Looking for 100: successor should return NULL
+    target = 100;
+    TEST_ASSERT_NULL(cavl2_successor(root, &target, &Comparator::compare));
+
+    // Test NULL arguments
+    TEST_ASSERT_NULL(cavl2_successor(nullptr, &target, &Comparator::compare));
+    TEST_ASSERT_NULL(cavl2_successor(root, &target, nullptr));
+}
+
 void test_bounds_comprehensive()
 {
     // Test with a complete tree and verify behavior at all boundaries
@@ -2100,6 +2234,31 @@ void test_bounds_comprehensive()
         } else {
             TEST_ASSERT_NULL(upper);
         }
+
+        // Expected predecessor: largest even <= i
+        // For odd i, it's i-1. For even i, it's i itself.
+        // If no such value exists (i < 0), return NULL. Since i starts at 0, never NULL for even tree.
+        const std::ptrdiff_t expected_pred = (i % 2 == 0) ? static_cast<std::ptrdiff_t>(i) : static_cast<std::ptrdiff_t>(i - 1);
+        // Expected successor: smallest even >= i
+        // Same as lower_bound.
+        const std::size_t expected_succ = expected_lower;
+
+        N* pred = reinterpret_cast<N*>(cavl2_predecessor(root, &target, &Comparator::compare));
+        N* succ = reinterpret_cast<N*>(cavl2_successor(root, &target, &Comparator::compare));
+
+        if (expected_pred >= 0) {
+            TEST_ASSERT_NOT_NULL(pred);
+            TEST_ASSERT_EQUAL(static_cast<std::uint8_t>(expected_pred), pred->value);
+        } else {
+            TEST_ASSERT_NULL(pred);
+        }
+
+        if (expected_succ <= 254) {
+            TEST_ASSERT_NOT_NULL(succ);
+            TEST_ASSERT_EQUAL(static_cast<std::uint8_t>(expected_succ), succ->value);
+        } else {
+            TEST_ASSERT_NULL(succ);
+        }
     }
 
     // Verify: for existing values, lower_bound returns the value itself, upper_bound returns the next
@@ -2146,6 +2305,8 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_replace_randomized);
     RUN_TEST(test_lower_bound);
     RUN_TEST(test_upper_bound);
+    RUN_TEST(test_predecessor);
+    RUN_TEST(test_successor);
     RUN_TEST(test_bounds_comprehensive);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
