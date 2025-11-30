@@ -2238,7 +2238,8 @@ void test_bounds_comprehensive()
         // Expected predecessor: largest even <= i
         // For odd i, it's i-1. For even i, it's i itself.
         // If no such value exists (i < 0), return NULL. Since i starts at 0, never NULL for even tree.
-        const std::ptrdiff_t expected_pred = (i % 2 == 0) ? static_cast<std::ptrdiff_t>(i) : static_cast<std::ptrdiff_t>(i - 1);
+        const std::ptrdiff_t expected_pred =
+          (i % 2 == 0) ? static_cast<std::ptrdiff_t>(i) : static_cast<std::ptrdiff_t>(i - 1);
         // Expected successor: smallest even >= i
         // Same as lower_bound.
         const std::size_t expected_succ = expected_lower;
