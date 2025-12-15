@@ -310,20 +310,20 @@ static inline CAVL2_T* cavl2_trivial_factory(void* const user)
 ///     struct cavl2_t* tree_node_b = cavl2_find(...);  // whatever
 ///     if (tree_node_b == NULL) { ... }                // do something else
 ///     struct my_type_t* my_struct = CAVL2_TO_OWNER(tree_node_b, struct my_type_t, tree_b);
-#define CAVL2_TO_OWNER(tree_node_ptr, owner_type, owner_tree_node_field)                                          \
-    ((owner_type*)_cavl2_to_owner_helper((tree_node_ptr), offsetof(owner_type, owner_tree_node_field))) // NOLINT
+#define CAVL2_TO_OWNER(tree_node_ptr, owner_type, owner_tree_node_field)                                              \
+    ((owner_type*)cavl2_impl_to_owner_helper((tree_node_ptr), offsetof(owner_type, owner_tree_node_field))) // NOLINT
 
 // ----------------------------------------     END OF PUBLIC API SECTION      ----------------------------------------
 // ----------------------------------------      POLICE LINE DO NOT CROSS      ----------------------------------------
 
 /// INTERNAL USE ONLY.
-static inline void* _cavl2_to_owner_helper(const void* const tree_node_ptr, const size_t offset)
+static inline void* cavl2_impl_to_owner_helper(const void* const tree_node_ptr, const size_t offset)
 {
     return (tree_node_ptr == NULL) ? NULL : (void*)((char*)tree_node_ptr - offset);
 }
 
 /// INTERNAL USE ONLY. Makes the '!r' child of node 'x' its parent; i.e., rotates 'x' toward 'r'.
-static inline void _cavl2_rotate(CAVL2_T* const x, const bool r)
+static inline void cavl2_impl_rotate(CAVL2_T* const x, const bool r)
 {
     CAVL2_ASSERT((x != NULL) && (x->lr[!r] != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     CAVL2_T* const z = x->lr[!r];
@@ -342,7 +342,7 @@ static inline void _cavl2_rotate(CAVL2_T* const x, const bool r)
 /// INTERNAL USE ONLY.
 /// Accepts a node and how its balance factor needs to be changed -- either +1 or -1.
 /// Returns the new node to replace the old one if tree rotation took place, same node otherwise.
-static inline CAVL2_T* _cavl2_adjust_balance(CAVL2_T* const x, const bool increment)
+static inline CAVL2_T* cavl2_impl_adjust_balance(CAVL2_T* const x, const bool increment)
 {
     CAVL2_ASSERT((x != NULL) && ((x->bf >= -1) && (x->bf <= +1)));
     CAVL2_T*          out    = x;
@@ -354,7 +354,7 @@ static inline CAVL2_T* _cavl2_adjust_balance(CAVL2_T* const x, const bool increm
         CAVL2_ASSERT(z != NULL);   // Heavy side cannot be empty.  NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         if ((z->bf * sign) <= 0) { // Parent and child are heavy on the same side or the child is balanced.
             out = z;
-            _cavl2_rotate(x, r);
+            cavl2_impl_rotate(x, r);
             if (0 == z->bf) {
                 x->bf = (int_fast8_t)(-sign);
                 z->bf = (int_fast8_t)(+sign);
@@ -366,8 +366,8 @@ static inline CAVL2_T* _cavl2_adjust_balance(CAVL2_T* const x, const bool increm
             CAVL2_T* const y = z->lr[r];
             CAVL2_ASSERT(y != NULL); // Heavy side cannot be empty.
             out = y;
-            _cavl2_rotate(z, !r);
-            _cavl2_rotate(x, r);
+            cavl2_impl_rotate(z, !r);
+            cavl2_impl_rotate(x, r);
             if ((y->bf * sign) < 0) {
                 x->bf = (int_fast8_t)(+sign);
                 y->bf = 0;
@@ -390,7 +390,7 @@ static inline CAVL2_T* _cavl2_adjust_balance(CAVL2_T* const x, const bool increm
 /// INTERNAL USE ONLY.
 /// Takes the culprit node (the one that is added); returns NULL or the root of the tree (possibly new one).
 /// When adding a new node, set its balance factor to zero and call this function to propagate the changes upward.
-static inline CAVL2_T* _cavl2_retrace_on_growth(CAVL2_T* const added)
+static inline CAVL2_T* cavl2_impl_retrace_on_growth(CAVL2_T* const added)
 {
     CAVL2_ASSERT((added != NULL) && (0 == added->bf));
     CAVL2_T* c = added;     // Child
@@ -398,11 +398,10 @@ static inline CAVL2_T* _cavl2_retrace_on_growth(CAVL2_T* const added)
     while (p != NULL) {
         const bool r = p->lr[1] == c; // c is the right child of parent
         CAVL2_ASSERT(p->lr[r] == c);
-        c = _cavl2_adjust_balance(p, r);
+        c = cavl2_impl_adjust_balance(p, r);
         p = c->up;
-        if (0 ==
-            c->bf) { // The height change of the subtree made this parent perfectly balanced (as all things should be),
-            break;   // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
+        if (0 == c->bf) { // The height change of the subtree made this parent balanced (as all things should be),
+            break; // hence, the height of the outer subtree is unchanged, so upper balance factors are unchanged.
         }
     }
     CAVL2_ASSERT(c != NULL);
@@ -437,7 +436,7 @@ static inline CAVL2_T* cavl2_find_or_insert(CAVL2_T** const          root,
                 out->lr[1]        = NULL;
                 out->up           = up;
                 out->bf           = 0;
-                CAVL2_T* const rt = _cavl2_retrace_on_growth(out);
+                CAVL2_T* const rt = cavl2_impl_retrace_on_growth(out);
                 if (rt != NULL) {
                     *root = rt;
                 }
@@ -472,8 +471,7 @@ static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node)
                 re->lr[1]     = node->lr[1];
                 re->lr[1]->up = re;
                 r             = false;
-            } else // In this case, we are reducing the height of the right subtree, so r=1.
-            {
+            } else {      // In this case, we are reducing the height of the right subtree, so r=1.
                 p = re;   // Retracing starts with the replacement node itself as we are deleting its parent.
                 r = true; // The right child of the replacement node remains the same so we don't bother relinking it.
             }
@@ -506,7 +504,7 @@ static inline void cavl2_remove(CAVL2_T** const root, CAVL2_T* const node)
         if (p != NULL) {
             CAVL2_T* c = NULL;
             for (;;) {
-                c = _cavl2_adjust_balance(p, !r);
+                c = cavl2_impl_adjust_balance(p, !r);
                 p = c->up;
                 if ((c->bf != 0) || (NULL == p)) { // Reached the root or the height difference is absorbed by c.
                     break;
