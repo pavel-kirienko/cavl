@@ -161,6 +161,19 @@ static inline bool cavl2_is_inserted(const CAVL2_T* const root, const CAVL2_T* c
     return out;
 }
 
+/// Remove the specified node if it is inserted in the tree; otherwise, do nothing.
+/// This is a convenience wrapper that combines cavl2_is_inserted() and cavl2_remove().
+/// Returns true if the node was inserted and has been removed, false otherwise.
+static inline bool cavl2_remove_if(CAVL2_T** const root, CAVL2_T* const node)
+{
+    bool removed = false;
+    if ((root != NULL) && cavl2_is_inserted(*root, node)) {
+        cavl2_remove(root, node);
+        removed = true;
+    }
+    return removed;
+}
+
 /// Return the min-/max-valued node stored in the tree, depending on the flag. This is an extremely fast query.
 /// Returns NULL iff the argument is NULL (i.e., the tree is empty). The worst-case complexity is O(log n).
 static inline CAVL2_T* cavl2_extremum(CAVL2_T* const root, const bool maximum)

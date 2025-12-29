@@ -1545,6 +1545,96 @@ void test_is_inserted()
     TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[3]));
 }
 
+void test_remove_if()
+{
+    using N = Node<std::uint8_t>;
+    N t[10]{};
+    for (std::uint8_t i = 0; i < 10; i++) {
+        t[i].value = i;
+    }
+    N* root = nullptr;
+
+    // Test with NULL root - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[0]));
+    TEST_ASSERT_NULL(root);
+
+    // Test with NULL node - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), nullptr));
+    TEST_ASSERT_NULL(root);
+
+    // Insert a single node (it becomes the root).
+    const auto pred1 = [&](const N& v) { return t[1].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[1], find_or_insert(&root, pred1, [&]() { return &t[1]; }));
+    TEST_ASSERT_EQUAL(&t[1], root);
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[1]));
+
+    // Try to remove a node that is not inserted - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[2]));
+    TEST_ASSERT_EQUAL(&t[1], root); // Root should be unchanged
+
+    // Remove the inserted node - should return true.
+    TEST_ASSERT_TRUE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[1]));
+    TEST_ASSERT_NULL(root); // Root should be NULL after removing the only node
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[1]));
+    // The removed node should have all NULL pointers.
+    TEST_ASSERT_NULL(t[1].up);
+    TEST_ASSERT_NULL(t[1].lr[0]);
+    TEST_ASSERT_NULL(t[1].lr[1]);
+
+    // Try to remove the same node again - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[1]));
+    TEST_ASSERT_NULL(root);
+
+    // Insert multiple nodes.
+    const auto pred2 = [&](const N& v) { return t[2].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[2], find_or_insert(&root, pred2, [&]() { return &t[2]; }));
+    const auto pred3 = [&](const N& v) { return t[3].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[3], find_or_insert(&root, pred3, [&]() { return &t[3]; }));
+    const auto pred4 = [&](const N& v) { return t[4].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[4], find_or_insert(&root, pred4, [&]() { return &t[4]; }));
+    const auto pred5 = [&](const N& v) { return t[5].value - v.value; };
+    TEST_ASSERT_EQUAL(&t[5], find_or_insert(&root, pred5, [&]() { return &t[5]; }));
+
+    // All inserted nodes should be inserted.
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[2]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[3]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[4]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[5]));
+
+    // Remove a middle node - should return true.
+    TEST_ASSERT_TRUE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[3]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[3]));
+    TEST_ASSERT_NULL(t[3].up);
+    TEST_ASSERT_NULL(t[3].lr[0]);
+    TEST_ASSERT_NULL(t[3].lr[1]);
+
+    // Try to remove the same node again - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[3]));
+
+    // Other nodes should still be inserted.
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[2]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[4]));
+    TEST_ASSERT_TRUE(cavl2_is_inserted(root, &t[5]));
+
+    // Remove a node that was never inserted - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[6]));
+
+    // Remove the remaining nodes.
+    TEST_ASSERT_TRUE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[2]));
+    TEST_ASSERT_TRUE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[4]));
+    TEST_ASSERT_TRUE(cavl2_remove_if(reinterpret_cast<cavl2_t**>(&root), &t[5]));
+    TEST_ASSERT_NULL(root);
+
+    // All removed nodes should not be inserted.
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[2]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[3]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[4]));
+    TEST_ASSERT_FALSE(cavl2_is_inserted(root, &t[5]));
+
+    // Test with NULL root pointer - should return false.
+    TEST_ASSERT_FALSE(cavl2_remove_if(nullptr, &t[0]));
+}
+
 void test_replace()
 {
     using N = Node<std::uint8_t>;
@@ -2302,6 +2392,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_trivial_factory);
     RUN_TEST(test_to_owner);
     RUN_TEST(test_is_inserted);
+    RUN_TEST(test_remove_if);
     RUN_TEST(test_replace);
     RUN_TEST(test_replace_randomized);
     RUN_TEST(test_lower_bound);
