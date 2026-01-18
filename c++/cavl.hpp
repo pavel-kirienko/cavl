@@ -103,24 +103,6 @@ protected:
     bool isRoot() const noexcept { return isLinked() && (!up->isLinked()); }
     auto getParentNode() noexcept -> Derived* { return isRoot() ? nullptr : down(up); }
     auto getParentNode() const noexcept -> const Derived* { return isRoot() ? nullptr : down(up); }
-    auto getRootNode() noexcept -> Derived*
-    {
-        Node* node = this;
-        while (node->up != nullptr && node->up->isLinked())
-        {
-            node = node->up;
-        }
-        return down(node);
-    }
-    auto getRootNode() const noexcept -> const Derived*
-    {
-        const Node* node = this;
-        while (node->up != nullptr && node->up->isLinked())
-        {
-            node = node->up;
-        }
-        return down(node);
-    }
     auto getChildNode(const bool right) noexcept -> Derived* { return down(lr[right]); }
     auto getChildNode(const bool right) const noexcept -> const Derived* { return down(lr[right]); }
     auto getBalanceFactor() const noexcept { return bf; }

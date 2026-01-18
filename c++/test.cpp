@@ -55,7 +55,6 @@ public:
     using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
-    using Self::getRootNode;
     using Self::getNextInOrderNode;
     using Self::getBalanceFactor;
     using Self::search;
@@ -992,60 +991,6 @@ void testManualMy()
         });
 }
 
-void testGetRootNode()
-{
-    // Build a simple tree to test getRootNode()
-    std::array<My, 10> nodes{};
-    for (std::uint16_t i = 0; i < 10; i++)
-    {
-        nodes[i] = My(static_cast<std::uint16_t>(i * 10 + 10));
-    }
-
-    MyTree tree;
-
-    // Insert nodes: 50, 30, 70, 20, 40, 60, 80
-    std::array<std::uint16_t, 7> values = {50, 30, 70, 20, 40, 60, 80};
-    for (const auto val : values)
-    {
-        const std::uint16_t idx = static_cast<std::uint16_t>((val / 10) - 1);
-        tree.search([val](const My& node) { return static_cast<std::int32_t>(val) - node.getValue(); },
-                    [&nodes, idx]() { return &nodes[idx]; });
-    }
-
-    // Get the root node pointer via implicit conversion
-    My* const root = tree;
-    TEST_ASSERT_NOT_NULL(root);
-
-    // Test that getRootNode() returns the root when called on the root
-    TEST_ASSERT_EQUAL(root, root->getRootNode());
-
-    // Test that getRootNode() returns the root when called on any node in the tree
-    for (const auto val : values)
-    {
-        const std::uint16_t idx = static_cast<std::uint16_t>((val / 10) - 1);
-        TEST_ASSERT_EQUAL(root, nodes[idx].getRootNode());
-    }
-
-    // Test with leaf nodes
-    TEST_ASSERT_EQUAL(root, nodes[1].getRootNode());  // value 20
-    TEST_ASSERT_EQUAL(root, nodes[3].getRootNode());  // value 40
-    TEST_ASSERT_EQUAL(root, nodes[5].getRootNode());  // value 60
-    TEST_ASSERT_EQUAL(root, nodes[7].getRootNode());  // value 80
-
-    // Test with internal nodes
-    TEST_ASSERT_EQUAL(root, nodes[2].getRootNode());  // value 30
-    TEST_ASSERT_EQUAL(root, nodes[6].getRootNode());  // value 70
-
-    // Test after removing a node
-    nodes[1].remove();          // Remove node with value 20
-    My* const new_root = tree;  // Root may have changed after removal
-    for (const auto val : std::array<std::uint16_t, 6>{50, 30, 70, 40, 60, 80})
-    {
-        const std::uint16_t idx = static_cast<std::uint16_t>((val / 10) - 1);
-        TEST_ASSERT_EQUAL(new_root, nodes[idx].getRootNode());
-    }
-}
-
 /// Ensure that polymorphic types can be used with the tree. The tree node type itself is not polymorphic!
 class V : public cavl::Node<V>
 {
@@ -1055,7 +1000,6 @@ public:
     using Self::isRoot;
     using Self::getChildNode;
     using Self::getParentNode;
-    using Self::getRootNode;
     using Self::getNextInOrderNode;
     using Self::getBalanceFactor;
     using Self::search;
@@ -1169,7 +1113,6 @@ int main(const int argc, const char* const argv[])
     // NOLINTBEGIN(misc-include-cleaner)
     UNITY_BEGIN();
     RUN_TEST(testManualMy);
-    RUN_TEST(testGetRootNode);
     RUN_TEST(testManualV);
     RUN_TEST(testRandomized);
     return UNITY_END();
