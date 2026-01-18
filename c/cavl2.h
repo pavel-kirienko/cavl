@@ -219,6 +219,22 @@ static inline CAVL2_T* cavl2_next_greater(CAVL2_T* const node)
     return c;
 }
 
+/// Find and return the root of the tree given an arbitrary node.
+/// Returns NULL if the argument is NULL. The worst-case complexity is O(log n).
+/// Behavior is undefined if the node is not in a tree.
+/// Example usage:
+///     CAVL2_T* some_node = ...; // any node in the tree
+///     CAVL2_T* root = cavl2_root(some_node);
+static inline CAVL2_T* cavl2_root(CAVL2_T* node)
+{
+    if (node != NULL) {
+        while (node->up != NULL) {
+            node = node->up;
+        }
+    }
+    return node;
+}
+
 /// Find the smallest node whose value is greater than or equal to the search target, in O(log n).
 /// Returns the first node for which the comparator returns a non-positive result.
 /// If no such node exists (all nodes compare less than target), returns NULL.

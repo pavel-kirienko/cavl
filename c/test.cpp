@@ -2369,6 +2369,64 @@ void test_bounds_comprehensive()
     }
 }
 
+void test_root()
+{
+    using N = Node<std::uint8_t>;
+    N t[20]{};
+    for (std::uint8_t i = 0; i < 20; i++) {
+        t[i].value = i;
+    }
+
+    // Test NULL argument
+    TEST_ASSERT_NULL(cavl2_root(nullptr));
+
+    // Build a tree with values: 10, 4, 14, 2, 6, 12, 16, 8, 18
+    N*                                root   = nullptr;
+    const std::array<std::uint8_t, 9> values = { 10, 4, 14, 2, 6, 12, 16, 8, 18 };
+    for (auto v : values) {
+        const auto pred = [&](const N& node) -> std::ptrdiff_t { return static_cast<std::ptrdiff_t>(v) - node.value; };
+        find_or_insert(&root, pred, [&] { return &t[v]; });
+    }
+
+    // Test that cavl2_root() returns the root when called on the root
+    TEST_ASSERT_EQUAL(root, cavl2_root(root));
+
+    // Test that cavl2_root() returns the root when called on any node in the tree
+    for (auto v : values) {
+        CAVL2_T* node_root = cavl2_root(&t[v]);
+        TEST_ASSERT_EQUAL(root, node_root);
+    }
+
+    // Test with leaf nodes
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[2]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[8]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[12]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[18]));
+
+    // Test with internal nodes
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[4]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[14]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[6]));
+    TEST_ASSERT_EQUAL(root, cavl2_root(&t[16]));
+
+    // Test with single node tree
+    N single_node{ 42 };
+    TEST_ASSERT_EQUAL(&single_node, cavl2_root(&single_node));
+
+    // Test after removing some nodes
+    remove(&root, &t[2]);
+    // The root might have changed, so check all remaining nodes point to the current root
+    for (auto v : std::array<std::uint8_t, 8>{ 10, 4, 14, 6, 12, 16, 8, 18 }) {
+        TEST_ASSERT_EQUAL(root, cavl2_root(&t[v]));
+    }
+
+    // Test that all nodes in the tree return the same root
+    CAVL2_T* root_from_min = cavl2_root(cavl2_min(root));
+    CAVL2_T* root_from_max = cavl2_root(cavl2_max(root));
+    TEST_ASSERT_EQUAL(root, root_from_min);
+    TEST_ASSERT_EQUAL(root, root_from_max);
+}
+
 } // namespace
 
 int main(const int argc, const char* const argv[])
@@ -2400,6 +2458,7 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_predecessor);
     RUN_TEST(test_successor);
     RUN_TEST(test_bounds_comprehensive);
+    RUN_TEST(test_root);
     return UNITY_END();
     // NOLINTEND(misc-include-cleaner)
 }
