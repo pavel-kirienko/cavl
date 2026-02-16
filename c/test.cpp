@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <initializer_list>
 #include <optional>
 #include <numeric>
 #include <vector>
@@ -2559,9 +2560,12 @@ void test_is_super_randomized()
         const auto subset_values   = collect_values(sub_root);
         const bool oracle_is_super =
           std::includes(superset_values.begin(), superset_values.end(), subset_values.begin(), subset_values.end());
-        const int_fast8_t expected =
-          oracle_is_super ? ((superset_values.size() == subset_values.size()) ? int_fast8_t{ 0 } : int_fast8_t{ 1 })
-                          : int_fast8_t{ -1 };
+        int_fast8_t expected;
+        if (oracle_is_super) {
+            expected = (superset_values.size() == subset_values.size()) ? int_fast8_t{ 0 } : int_fast8_t{ 1 };
+        } else {
+            expected = int_fast8_t{ -1 };
+        };
 
         TEST_ASSERT_EQUAL(expected, is_super(sup_root, sub_root, comparator));
         validate_tree(sup_root, superset_values.size());
