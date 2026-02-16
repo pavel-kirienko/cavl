@@ -11,6 +11,7 @@
 #include <ctime>
 #include <optional>
 #include <numeric>
+#include <vector>
 
 void setUp() {}
 
@@ -130,6 +131,23 @@ template<typename T>
 void replace(Node<T>** const root, Node<T>* const old_node, Node<T>* const new_node)
 {
     cavl2_replace(reinterpret_cast<cavl2_t**>(root), old_node, new_node);
+}
+
+template<typename T, typename Comparator>
+int_fast8_t is_super(Node<T>* const sup, Node<T>* const sub, const Comparator& comparator)
+{
+    struct Refs
+    {
+        Comparator comparator;
+
+        static CAVL2_RELATION call(const void* const user, const cavl2_t* const left, const cavl2_t* const right)
+        {
+            return static_cast<const Refs*>(user)->comparator(reinterpret_cast<const Node<T>&>(*left),
+                                                              reinterpret_cast<const Node<T>&>(*right));
+        }
+    } refs{ comparator };
+
+    return cavl2_is_super(reinterpret_cast<cavl2_t*>(sup), reinterpret_cast<cavl2_t*>(sub), &refs, &Refs::call);
 }
 
 template<typename T>
@@ -2369,6 +2387,193 @@ void test_bounds_comprehensive()
     }
 }
 
+void test_is_super_manual()
+{
+    using N = Node<std::uint8_t>;
+
+    const auto comparator = [](const N& left, const N& right) -> CAVL2_RELATION {
+        return static_cast<CAVL2_RELATION>(static_cast<std::ptrdiff_t>(left.value) -
+                                           static_cast<std::ptrdiff_t>(right.value));
+    };
+
+    const auto build_tree = [](N*& root, std::array<N, 256>& nodes, const std::initializer_list<std::uint8_t>& values) {
+        root = nullptr;
+        for (std::size_t i = 0U; i < nodes.size(); i++) {
+            nodes.at(i).value = static_cast<std::uint8_t>(i);
+        }
+        for (const auto value : values) {
+            const auto pred = [&](const N& node) -> std::ptrdiff_t {
+                return static_cast<std::ptrdiff_t>(value) - static_cast<std::ptrdiff_t>(node.value);
+            };
+            TEST_ASSERT_EQUAL(&nodes.at(value), find_or_insert(&root, pred, [&] { return &nodes.at(value); }));
+        }
+    };
+
+    const auto validate_tree = [](N* const root, const std::size_t expected_size) {
+        TEST_ASSERT_EQUAL(expected_size, check_ascension(root));
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    };
+
+    const auto run_case = [&](const std::initializer_list<std::uint8_t>& sup_values,
+                              const std::initializer_list<std::uint8_t>& sub_values,
+                              const int_fast8_t                          expected) {
+        std::array<N, 256> sup_nodes{};
+        std::array<N, 256> sub_nodes{};
+        N*                 sup_root = nullptr;
+        N*                 sub_root = nullptr;
+        build_tree(sup_root, sup_nodes, sup_values);
+        build_tree(sub_root, sub_nodes, sub_values);
+
+        TEST_ASSERT_EQUAL(expected, is_super(sup_root, sub_root, comparator));
+        validate_tree(sup_root, sup_values.size());
+        validate_tree(sub_root, sub_values.size());
+    };
+
+    run_case({}, {}, 0);
+    run_case({ 1, 2, 3 }, {}, +1);
+    run_case({}, { 1, 2, 3 }, -1);
+    run_case({ 1, 2, 3 }, { 1, 2, 3 }, 0);
+    run_case({ 1, 2, 3, 4, 5 }, { 2, 4 }, +1);
+    run_case({ 2, 4 }, { 1, 2, 3 }, -1);
+    run_case({ 1, 3, 5 }, { 2, 4, 6 }, -1);
+    run_case({ 1, 2, 5 }, { 1, 3, 5 }, -1);
+    run_case({ 5 }, { 5 }, 0);
+    run_case({ 3, 5, 7 }, { 5 }, +1);
+    run_case({ 5 }, { 3, 5, 7 }, -1);
+
+    {
+        std::array<N, 256> nodes{};
+        N*                 root = nullptr;
+        build_tree(root, nodes, { 1, 2, 3 });
+        TEST_ASSERT_EQUAL(0, is_super(root, root, comparator));
+        validate_tree(root, 3);
+        validate_tree(root, 3);
+    }
+
+    {
+        std::array<N, 256> sup_nodes{};
+        std::array<N, 256> sub_nodes{};
+        N*                 sup_root = nullptr;
+        N*                 sub_root = nullptr;
+        build_tree(sup_root, sup_nodes, { 1, 2, 3 });
+        build_tree(sub_root, sub_nodes, { 1, 2, 3 });
+
+        TEST_ASSERT_EQUAL(
+          0,
+          cavl2_is_super(reinterpret_cast<cavl2_t*>(sup_root), reinterpret_cast<cavl2_t*>(sub_root), nullptr, nullptr));
+        validate_tree(sup_root, 3);
+        validate_tree(sub_root, 3);
+    }
+
+    run_case({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, { 2, 5, 8 }, +1);
+    run_case({ 1, 10 }, { 1 }, +1);
+    run_case({ 1, 10 }, { 10 }, +1);
+    run_case({ 1, 10 }, { 5 }, -1);
+}
+
+void test_is_super_randomized()
+{
+    using N = Node<std::uint8_t>;
+
+    std::array<N, 256>    sup_nodes{};
+    std::array<N, 256>    sub_nodes{};
+    std::array<bool, 256> sup_mask{};
+    std::array<bool, 256> sub_mask{};
+
+    for (std::size_t i = 0U; i < 256U; i++) {
+        sup_nodes.at(i).value = static_cast<std::uint8_t>(i);
+        sub_nodes.at(i).value = static_cast<std::uint8_t>(i);
+    }
+
+    const auto comparator = [](const N& left, const N& right) -> CAVL2_RELATION {
+        return static_cast<CAVL2_RELATION>(static_cast<std::ptrdiff_t>(left.value) -
+                                           static_cast<std::ptrdiff_t>(right.value));
+    };
+
+    const auto reset_nodes = [](std::array<N, 256>& nodes) {
+        for (auto& node : nodes) {
+            node.up    = nullptr;
+            node.lr[0] = nullptr;
+            node.lr[1] = nullptr;
+            node.bf    = 0;
+        }
+    };
+
+    const auto build_tree = [&](N*& root, std::array<N, 256>& nodes, const std::array<bool, 256>& mask) {
+        root = nullptr;
+        for (std::size_t i = 0U; i < mask.size(); i++) {
+            if (mask.at(i)) {
+                const auto pred = [&](const N& node) -> std::ptrdiff_t {
+                    return static_cast<std::ptrdiff_t>(i) - static_cast<std::ptrdiff_t>(node.value);
+                };
+                TEST_ASSERT_EQUAL(&nodes.at(i), find_or_insert(&root, pred, [&] { return &nodes.at(i); }));
+            }
+        }
+    };
+
+    const auto collect_values = [](N* const root) {
+        std::vector<std::uint8_t> values;
+        values.reserve(256U);
+        traverse<true>(root, [&](const N* const node) { values.push_back(node->value); });
+        return values;
+    };
+
+    const auto validate_tree = [](N* const root, const std::size_t expected_size) {
+        TEST_ASSERT_EQUAL(expected_size, check_ascension(root));
+        TEST_ASSERT_NULL(find_broken_bf(root));
+        TEST_ASSERT_NULL(find_broken_ancestry(root));
+    };
+
+    N* sup_root = nullptr;
+    N* sub_root = nullptr;
+
+    std::uint64_t subset_mode_count      = 0;
+    std::uint64_t independent_mode_count = 0;
+
+    std::puts("Running randomized is_super test...");
+    for (std::uint32_t iteration = 0U; iteration < 100'000U; iteration++) {
+        const bool subset_mode = ((get_random_byte() % 2U) == 0U);
+        if (subset_mode) {
+            subset_mode_count++;
+        } else {
+            independent_mode_count++;
+        }
+
+        for (std::size_t i = 0U; i < 256U; i++) {
+            const bool sup_contains = ((get_random_byte() % 4U) == 0U);
+            sup_mask.at(i)          = sup_contains;
+            if (subset_mode) {
+                sub_mask.at(i) = sup_contains && ((get_random_byte() % 2U) == 0U);
+            } else {
+                sub_mask.at(i) = ((get_random_byte() % 4U) == 0U);
+            }
+        }
+
+        reset_nodes(sup_nodes);
+        reset_nodes(sub_nodes);
+        build_tree(sup_root, sup_nodes, sup_mask);
+        build_tree(sub_root, sub_nodes, sub_mask);
+
+        const auto superset_values = collect_values(sup_root);
+        const auto subset_values   = collect_values(sub_root);
+        const bool oracle_is_super =
+          std::includes(superset_values.begin(), superset_values.end(), subset_values.begin(), subset_values.end());
+        const int_fast8_t expected =
+          oracle_is_super ? ((superset_values.size() == subset_values.size()) ? int_fast8_t{ 0 } : int_fast8_t{ 1 })
+                          : int_fast8_t{ -1 };
+
+        TEST_ASSERT_EQUAL(expected, is_super(sup_root, sub_root, comparator));
+        validate_tree(sup_root, superset_values.size());
+        validate_tree(sub_root, subset_values.size());
+    }
+
+    std::puts("Randomized is_super test finished:");
+    std::printf("\titerations:       %u\n", 100'000U);
+    std::printf("\tsubset mode:      %u\n", static_cast<unsigned>(subset_mode_count));
+    std::printf("\tindependent mode: %u\n", static_cast<unsigned>(independent_mode_count));
+}
+
 void test_root()
 {
     using N = Node<std::uint8_t>;
@@ -2446,6 +2651,8 @@ int main(const int argc, const char* const argv[])
     RUN_TEST(test_removal_a);
     RUN_TEST(test_mutation_manual);
     RUN_TEST(test_mutation_randomized);
+    RUN_TEST(test_is_super_manual);
+    RUN_TEST(test_is_super_randomized);
     RUN_TEST(test_traversal_full);
     RUN_TEST(test_trivial_factory);
     RUN_TEST(test_to_owner);
