@@ -102,6 +102,9 @@ static_assert(sizeof(CAVL2_T) <= sizeof(void* [4]), "Bad size");
 /// Returns POSITIVE if the search target is GREATER than the provided node, negative if smaller, zero on match (found).
 typedef CAVL2_RELATION (*cavl2_comparator_t)(const void* user, const CAVL2_T* node);
 
+/// Compares two tree nodes that may come from different trees and reports their ordering relation.
+typedef CAVL2_RELATION (*cavl2_node_cmp_t)(const void* user, const CAVL2_T* left, const CAVL2_T* right);
+
 /// If provided, the factory will be invoked when the sought node does not exist in the tree.
 /// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
 /// If the factory returns NULL or is not provided, the tree is not modified.
@@ -309,6 +312,43 @@ static inline CAVL2_T* cavl2_predecessor(CAVL2_T* const           root,
 static inline CAVL2_T* cavl2_successor(CAVL2_T* const root, const void* const user, const cavl2_comparator_t comparator)
 {
     return cavl2_lower_bound(root, user, comparator);
+}
+
+/// Determine the set relation between two AVL trees by checking whether sup is a superset of sub.
+/// Returns +1 if sup is a proper superset of sub, 0 if the sets are equal, and -1 otherwise
+/// (sup is not a superset, including orthogonal sets).
+/// The comparator shall define a well-defined total ordering over nodes from both trees; node types may differ.
+/// If comparator is NULL, returns 0. Complexity: O(n+m) time, O(1) additional space.
+static inline int_fast8_t cavl2_is_super(CAVL2_T* const         sup,
+                                         CAVL2_T* const         sub,
+                                         const void* const      user,
+                                         const cavl2_node_cmp_t comparator)
+{
+    if (comparator == NULL) {
+        return 0;
+    }
+
+    CAVL2_T* cursor_sup    = cavl2_min(sup);
+    CAVL2_T* cursor_sub    = cavl2_min(sub);
+    bool     sup_has_extra = false;
+
+    while (cursor_sub != NULL) {
+        if (cursor_sup == NULL) {
+            return -1;
+        }
+        const CAVL2_RELATION cmp = comparator(user, cursor_sup, cursor_sub);
+        if (cmp < 0) {
+            sup_has_extra = true;
+            cursor_sup    = cavl2_next_greater(cursor_sup);
+        } else if (cmp == 0) {
+            cursor_sup = cavl2_next_greater(cursor_sup);
+            cursor_sub = cavl2_next_greater(cursor_sub);
+        } else {
+            return -1;
+        }
+    }
+
+    return (sup_has_extra || (cursor_sup != NULL)) ? +1 : 0;
 }
 
 /// The trivial factory is useful in most applications. It simply returns the user pointed converted to CAVL2_T.
