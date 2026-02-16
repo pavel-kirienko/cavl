@@ -103,7 +103,7 @@ static_assert(sizeof(CAVL2_T) <= sizeof(void* [4]), "Bad size");
 typedef CAVL2_RELATION (*cavl2_comparator_t)(const void* user, const CAVL2_T* node);
 
 /// Compares two tree nodes that may come from different trees and reports their ordering relation.
-typedef CAVL2_RELATION (*cavl2_node_cmp_t)(const void* user, const CAVL2_T* left, const CAVL2_T* right);
+typedef CAVL2_RELATION (*cavl2_node_comparator_t)(const void* user, const CAVL2_T* left, const CAVL2_T* right);
 
 /// If provided, the factory will be invoked when the sought node does not exist in the tree.
 /// It is expected to return a new node that will be inserted immediately (without the need to traverse the tree again).
@@ -319,10 +319,10 @@ static inline CAVL2_T* cavl2_successor(CAVL2_T* const root, const void* const us
 /// (sup is not a superset, including orthogonal sets).
 /// The comparator shall define a well-defined total ordering over nodes from both trees; node types may differ.
 /// If comparator is NULL, returns 0. Complexity: O(n+m) time, O(1) additional space.
-static inline int_fast8_t cavl2_is_super(CAVL2_T* const         sup,
-                                         CAVL2_T* const         sub,
-                                         const void* const      user,
-                                         const cavl2_node_cmp_t comparator)
+static inline int_fast8_t cavl2_is_super(CAVL2_T* const                sup,
+                                         CAVL2_T* const                sub,
+                                         const void* const             user,
+                                         const cavl2_node_comparator_t comparator)
 {
     if (comparator == NULL) {
         return 0;
