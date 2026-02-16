@@ -36,6 +36,8 @@ dkms.conf
 build*/
 cmake-build*/
 __pycache__/
+.cache/
+.sisyphus/
 .metadata
 .settings
 .project
